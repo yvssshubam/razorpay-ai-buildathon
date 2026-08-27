@@ -23,9 +23,9 @@ import matplotlib.pyplot as plt
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 injected     = [0.00, 0.05, 0.10, 0.20, 0.40]
-measured     = [0.000, 0.047, 0.087, 0.198, 0.390]
-blocked      = [0.32, 0.46, 0.58, 0.76, 0.92]
-completeness = [0.818, 0.780, 0.746, 0.642, 0.487]
+measured     = [0.000, 0.053, 0.115, 0.211, 0.401]
+blocked      = [0.30, 0.44, 0.62, 0.76, 0.96]
+completeness = [0.844, 0.804, 0.752, 0.662, 0.493]
 
 GEMINI_MEASURED = 0.000   # 17 claims over 5 disputes; update after the 100-run
 

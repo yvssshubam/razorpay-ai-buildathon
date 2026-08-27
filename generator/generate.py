@@ -13,6 +13,13 @@ FREEZE DISCIPLINE: commit this file, then `git tag generator-frozen-v1` with a
 dated message, and only then write agent/. The public tag makes the ordering
 provable and pre-empts "the data was reverse-engineered from the model".
 
+v2 (2026-08-27): rulebook corrected against Razorpay's published docs. The
+evidence vocabulary is now DERIVED from the rulebook rather than hardcoded
+here. v1 carried a hardcoded ALL_ARTIFACTS list that nothing read, so the
+generator and the rulebook could drift apart silently -- and did. Deriving the
+vocabulary means they cannot disagree, and validate_against_rulebook() fails
+the run if the case taxonomy cites a code the rulebook does not define.
+
 Usage:
   python -m generator.generate --profile train   --n 3000 --seed 11 --out data/train.jsonl
   python -m generator.generate --profile holdout --n 800  --seed 97 --out data/holdout.jsonl
@@ -23,61 +30,73 @@ import json
 import random
 
 from rulebook_loader import load_rulebook
-from cases import cases_for, TIER_WEIGHTS
+from cases import cases_for, validate_against_rulebook, TIER_WEIGHTS
 import distributions as dist
 
-# Every artifact type the rulebook can ask for. The generator populates a subset.
-ALL_ARTIFACTS = [
-    "delivery_confirmation", "tracking_info", "signed_pod", "avs_result",
-    "cancellation_policy", "no_cancellation_proof", "usage_logs", "terms_of_service",
-    "item_description", "policy_displayed", "terms_acceptance", "refund_record",
-    "refund_timestamp", "communication_log", "device_fingerprint", "ip_record",
-    "prior_undisputed_history", "auth_record", "settlement_record", "duplicate_check",
-    "alternate_payment_proof",
-]
+
+def evidence_vocabulary(rulebook):
+    """Every artifact kind any code can ask for, derived from the rulebook.
+    Single source of truth: if a kind is not in the rulebook, it cannot be
+    generated, and vice versa."""
+    kinds = set()
+    for rc in rulebook["codes"].values():
+        kinds.update(rc.get("required_evidence") or {})
+    return sorted(kinds)
 
 
-def _mk_artifact(kind, aid, rng, stale=False, dispute_day=20):
-    """Build one evidence artifact with a concrete, checkable payload."""
+def _mk_artifact(kind, aid, api_field, rng, stale=False, dispute_day=20):
+    """Build one evidence artifact with a concrete, checkable payload.
+
+    api_field records which slot of Razorpay's contest API this artifact would
+    be submitted under. Carrying it here means the assembled packet maps onto a
+    real submission payload rather than an invented schema.
+    """
     # A day offset; stale artifacts land AFTER the dispute (higher day).
-    day = rng.randint(dispute_day + 1, dispute_day + 5) if stale else rng.randint(0, dispute_day - 1)
+    day = (rng.randint(dispute_day + 1, dispute_day + 5) if stale
+           else rng.randint(0, dispute_day - 1))
     return {
         "artifact_id": aid,
         "kind": kind,
+        "api_field": api_field,
         "created_day": day,
-        # a couple of checkable fields the verifier can read
         "present": True,
         "value": f"{kind}:{rng.randint(1000, 9999)}",
     }
 
 
 def build_evidence(case, required, rng, dispute_day):
-    """Return (artifacts, present_kinds) honouring the case's evidence mode."""
+    """Return (artifacts, present_kinds) honouring the case's evidence mode.
+
+    `required` is the rulebook's {kind: api_field} mapping for this code.
+    """
     mode = case["evidence"]
+    kinds = list(required)
     artifacts = {}
     present = set()
 
     if mode == "full":
-        keep = required
+        keep = kinds
     elif mode == "partial":
         # drop one required artifact at random
-        keep = list(required)
+        keep = list(kinds)
         if len(keep) > 1:
             keep.remove(rng.choice(keep))
     elif mode == "gap":
-        # a required artifact never existed: drop ~half, always missing at least one
-        keep = [a for a in required if rng.random() > 0.5]
-        if set(keep) == set(required) and required:
+        # a required artifact never existed: drop ~half, always at least one
+        keep = [a for a in kinds if rng.random() > 0.5]
+        if set(keep) == set(kinds) and kinds:
             keep = keep[:-1]
     elif mode == "stale":
-        keep = required  # present, but timestamped after the dispute
+        keep = kinds  # present, but timestamped after the dispute
     else:
-        keep = required
+        keep = kinds
 
-    for i, kind in enumerate(keep):
-        aid = f"{kind[:4]}_{rng.randint(1000, 9999)}"
+    for kind in keep:
+        # Kind names are long and share prefixes now, so use a wider slug to
+        # keep artifact ids readable and collision-free.
+        aid = f"{kind[:12]}_{rng.randint(1000, 9999)}"
         artifacts[aid] = _mk_artifact(
-            kind, aid, rng,
+            kind, aid, required[kind], rng,
             stale=(mode == "stale"),
             dispute_day=dispute_day,
         )
@@ -97,8 +116,8 @@ def sample_case(rng, cases):
 def make_dispute(idx, rng, cases, rulebook):
     case = sample_case(rng, cases)
     code = case["reason_code"]
-    rc = rulebook["reason_codes"][code]
-    required = rc["evidence"]
+    rc = rulebook["codes"][code]
+    required = rc["required_evidence"]          # {kind: api_field}
 
     amount = dist.draw_amount(rng)
     dispute_day = 20
@@ -124,6 +143,7 @@ def make_dispute(idx, rng, cases, rulebook):
         "dispute_id": f"D{idx:05d}",
         "reason_code": code,
         "network": rc["network"],
+        "category": rc.get("category"),
         "amount": amount,
         "hour": dist.draw_hour(rng),
         "day_of_week": dist.draw_day_of_week(rng),
@@ -131,7 +151,7 @@ def make_dispute(idx, rng, cases, rulebook):
         "prior_disputes": prior_disputes,
         "new_device": new_device,
         "dispute_day": dispute_day,
-        "required_evidence": required,
+        "required_evidence": sorted(required),
         "present_evidence": sorted(present),
         "artifacts": artifacts,
         # ---- labels / latent: NOT to be fed to the model as features ----
@@ -152,6 +172,13 @@ def main():
 
     rng = random.Random(args.seed)
     rulebook = load_rulebook()
+
+    # Hard gate: the taxonomy must not cite a code the rulebook lacks.
+    validate_against_rulebook(rulebook)
+    vocab = evidence_vocabulary(rulebook)
+    print(f"[rulebook] {len(rulebook['codes'])} codes, "
+          f"{len(vocab)} distinct evidence kinds")
+
     cases = cases_for(args.profile)
 
     # holdout shifts the mix slightly so it measures generalisation, not memory
@@ -165,7 +192,8 @@ def main():
             d = make_dispute(i, rng, cases, rulebook)
             f.write(json.dumps(d) + "\n")
 
-    print(f"wrote {args.n} disputes -> {args.out} (profile={args.profile}, seed={args.seed})")
+    print(f"wrote {args.n} disputes -> {args.out} "
+          f"(profile={args.profile}, seed={args.seed})")
 
 
 if __name__ == "__main__":

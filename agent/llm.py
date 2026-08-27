@@ -28,19 +28,29 @@ class LLMError(RuntimeError):
     pass
 
 
-def _post(url, payload, headers=None):
+def _post(url, payload, headers=None, retries=3):
+    """Retry with backoff. A transient timeout mid-sweep should cost seconds,
+    not the whole run."""
+    import time
     body = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=body,
-        headers={"Content-Type": "application/json", **(headers or {})})
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-            return json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        raise LLMError(f"{e.code}: {e.read().decode('utf-8')[:400]}") from e
-    except urllib.error.URLError as e:
-        raise LLMError(f"unreachable: {e.reason}") from e
-
+    last = None
+    for attempt in range(retries):
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"Content-Type": "application/json", **(headers or {})})
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8")[:400]
+            if e.code not in (429, 500, 502, 503, 504):
+                raise LLMError(f"{e.code}: {detail}") from e
+            last = LLMError(f"{e.code}: {detail}")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last = LLMError(f"unreachable: {e}")
+        if attempt < retries - 1:
+            time.sleep(2 ** attempt)
+    raise LLMError(f"failed after {retries} attempts: {last}")
 
 def _strip_fences(text):
     t = text.strip()
