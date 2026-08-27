@@ -1,0 +1,77 @@
+Cost constant sweep -- 2026-08-27
+Holdout: data/holdout.jsonl (n=800). Rulebook v3. Learned p(win) (calibrated classifier).
+
+One constant varied at a time; the other three held at their defaults.
+Both the decision path (generator/distributions.py) and the scoring path
+(eval/distributions_ref.py) are patched, since they are separate modules.
+An earlier version of this sweep patched only the decision path and reported
+a robust result while measuring nothing; see git history.
+
+defaults: {'CONTEST_COST': 250.0, 'HUMAN_REVIEW_COST': 800.0, 'NET_RECOVERY_FRACTION': 0.85, 'HUMAN_RESOLVE_RATE': 0.8}
+
+=== CONTEST_COST (default 250.0) ===
+     value        agent  contest_all       margin
+       100      591,869      414,315      177,554
+       175      552,868      354,315      198,552
+       250      517,048      294,315      222,732
+       400      451,547      174,315      277,232
+       600      383,816       14,315      369,501
+       900      294,555     -225,685      520,240
+
+=== HUMAN_REVIEW_COST (default 800.0) ===
+     value        agent  contest_all       margin
+       300      523,529      434,315       89,214
+       500      522,206      378,315      143,890
+       800      517,048      294,315      222,732
+      1200      518,917      182,315      336,602
+      1800      505,431       14,315      491,116
+      2500      503,703     -181,685      685,388
+
+=== NET_RECOVERY_FRACTION (default 0.85) ===
+     value        agent  contest_all       margin
+       0.5      258,220       -1,462      259,682
+      0.65      369,734      125,300      244,434
+       0.8      479,201      252,062      227,140
+       0.9      553,287      336,569      216,717
+       1.0      628,103      421,077      207,026
+
+=== HUMAN_RESOLVE_RATE (default 0.8) ===
+     value        agent  contest_all       margin
+       0.2      505,799      223,494      282,305
+      0.35      503,015      241,200      261,816
+       0.5      511,292      258,905      252,387
+      0.65      511,185      276,610      234,575
+       0.8      517,048      294,315      222,732
+
+============================================================
+Agent beats contest-all across every value tested for:
+CONTEST_COST, HUMAN_REVIEW_COST, NET_RECOVERY_FRACTION, HUMAN_RESOLVE_RATE
+
+READING THE RESULT
+------------------
+The agent wins everywhere, but the more useful finding is the difference in
+SENSITIVITY. The agent escalates 40 packets; contest-all escalates 280.
+
+  HUMAN_REVIEW_COST  Rs 300 -> Rs 2500 (8x)
+    agent        523,529 -> 503,703    (-3.8%)
+    contest_all  434,315 -> -181,685   (turns negative)
+
+  HUMAN_RESOLVE_RATE  0.2 -> 0.8 (4x)
+    agent        505,799 -> 517,048    (+2.2%)
+    contest_all  223,494 -> 294,315    (+31.7%)
+
+Contest-all turns negative in three of the four sweeps: at CONTEST_COST 900,
+at HUMAN_REVIEW_COST 2500, and at NET_RECOVERY_FRACTION 0.5. The agent never
+does.
+
+These four constants were chosen, not measured. The point of the sweep is that
+the ordering does not depend on having chosen them correctly -- and that the
+agent's rupee figure is far less exposed to them than contest-all's is. Where
+the true values are unknown, that stability is itself the argument.
+
+NET_RECOVERY_FRACTION behaves as expected: the margin compresses as recovery
+improves (259,682 at 0.5 down to 207,026 at 1.0), because full recovery makes
+indiscriminate contesting more attractive. The agent's advantage is largest
+when recovery is poor, which is the realistic case -- industry net recovery
+after second-cycle chargebacks and representment costs is reported at 12-18%
+(US/global; see README "Data and its limits").
