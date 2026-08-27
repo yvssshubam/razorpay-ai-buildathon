@@ -1,0 +1,70 @@
+{
+  "source": "IEEE-CIS Fraud Detection (Kaggle/Vesta), train_transaction.csv",
+  "n_transactions": 590540,
+  "currency": "USD",
+  "amount": {
+    "lognormal_mu": 4.363863830431362,
+    "lognormal_sigma": 0.9540368827325205,
+    "mean": 135.02717637247264,
+    "median": 68.769,
+    "min": 0.251,
+    "max": 31937.391,
+    "skew": 14.374489573829827,
+    "quantiles": {
+      "0.01": 9.244,
+      "0.05": 20.0,
+      "0.25": 43.321,
+      "0.5": 68.769,
+      "0.75": 125.0,
+      "0.9": 275.293,
+      "0.95": 445.0,
+      "0.99": 1104.0,
+      "0.999": 2769.8073200000217
+    }
+  },
+  "hour_weights": [
+    0.06400074508077352,
+    0.0555373048396383,
+    0.04526704372269448,
+    0.03522538693399262,
+    0.02512784908727605,
+    0.016427337690926948,
+    0.010172045924069496,
+    0.0062722254208013,
+    0.004387509736851018,
+    0.00419785281267992,
+    0.006141836285433671,
+    0.011560605547465031,
+    0.02108409252548515,
+    0.03440071798692722,
+    0.047969654892132625,
+    0.05733565888847496,
+    0.065529854031903,
+    0.06895891895553223,
+    0.0705100416567887,
+    0.07131608358451587,
+    0.07075219290818573,
+    0.07051342838757747,
+    0.0696633589595963,
+    0.06764825414027839
+  ],
+  "day_of_week_weights": [
+    0.1462678226707759,
+    0.16679987807769162,
+    0.13518813289531614,
+    0.11891319808988383,
+    0.14466928573847665,
+    0.14362278592474684,
+    0.144538896603109
+  ],
+  "fraud": {
+    "rate": 0.03499000914417313,
+    "median_amount_fraud": 75.0,
+    "median_amount_clean": 68.5
+  },
+  "caveats": [
+    "Amounts are USD. The generator fits the SHAPE (log-normal sigma and the quantile structure) and rescales the location to Indian e-commerce order values. The distribution is real; the scale is set.",
+    "TransactionDT is seconds from an unspecified origin, so day-of-week indices are relative to that origin and do not map to calendar days.",
+    "isFraud labels fraud, not chargeback outcomes. No dispute verdicts are taken from this dataset."
+  ]
+}
