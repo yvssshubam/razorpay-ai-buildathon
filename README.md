@@ -26,6 +26,13 @@ The agent recovers **₹236,153 more than contesting everything** — 1.8× the
 return on the same 800 disputes — while submitting fewer packets (392 vs 484)
 and sending one sixth as many to a human (50 vs 316).
 
+**A note on two columns.** `complete` and `halluc` do not appear in the table
+above, and deliberately so: the policy scorer in `eval/baselines.py` builds
+packets with a deterministic builder rather than calling Stages 3 and 4, so
+those two metrics would be arithmetic rather than measurements there. They are
+measured separately, on the real drafting and verification path, in the verifier
+section below.
+
 **Two precision numbers, deliberately.** *Winnable* precision asks whether we
 would have won. *EV* precision asks whether contesting was worth attempting at
 ₹250 a go. They disagree, and the disagreement is the product thesis: a ₹450
@@ -76,6 +83,19 @@ the measured rate compared:
 | 0.40 | 0.390 | 0.94 | 0.511 |
 
 Detection tracks injection across an eightfold range.
+
+**On the real model.** `gemini-3.1-flash-lite` was run over the same 50
+disputes: **zero fabrications across 223 claims**, block rate 0.340, mean
+completeness 0.844. Those last two figures are identical to the mock's
+zero-fault row above, on the same disputes — so every block came from the
+evidence itself, not from how the mock constructs claims. Two independent runs
+agreeing is what makes the intercept below a property of the data rather than an
+artifact of the harness.
+
+A zero fabrication rate does not make the gate redundant; it means this model
+did not test it. The injected-fault curve is what demonstrates the gate works
+when a model does fabricate. Both claims are needed and neither substitutes for
+the other.
 
 **The intercept is the more interesting number.** At *zero* model error, about a
 third of packets still block — on evidence timestamped after the dispute, and on
@@ -297,11 +317,13 @@ project treats the full suggested list as the completeness bar, because a
 partial packet is the failure mode worth measuring. That is a modelling choice,
 not a claim about what the networks mandate.
 
-**The hallucination rate against a real model is thin.** Gemini produced zero
-fabrications across 17 claims on 5 disputes — too few claims to be a rate. The
-verifier curve in §1 is the robust result; it measures the *gate*, using
-injected faults, and holds across an eightfold range. These are two different
-claims and are not interchangeable.
+**The real-model hallucination measurement is one model on one dataset.**
+`gemini-3.1-flash-lite` produced zero fabrications across 223 claims on 50
+disputes (§1). That bounds the rate below roughly 1.3%, but it is a single model
+on a single generated dataset, and the constrained retrieval is doing real work
+— the model cannot cite an artifact it was never shown. A zero here means the
+verifier was *untested* by this model, not that it is unnecessary; that is
+exactly what the fault-injection curve is for.
 
 **Training and holdout amounts come from the same sampling pool.** Other
 parameters differ between the two sets by design; amounts do not, because both
@@ -377,8 +399,10 @@ python cost_sweep.py
 ```
 
 Drafting defaults to a deterministic mock provider with a configurable fault
-rate — no API key, no network. Set `CB_LLM=gemini` and `GEMINI_API_KEY` in
-`.env` for the real model.
+rate — no API key, no network. For the real model, set `GEMINI_API_KEY` and
+`CB_LLM_MODEL=gemini-3.1-flash-lite` in `.env`, then `CB_LLM=gemini`. The
+reported run used 50 disputes at 4.5s intervals to stay inside the free tier's
+15 requests/minute.
 
 The IEEE-CIS CSV is not in this repository (683MB, and not ours to
 redistribute). `rulebook/ieee_profile.json` and `data/ieee_amount_sample.json`
