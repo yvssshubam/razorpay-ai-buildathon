@@ -98,6 +98,8 @@ if __name__ == "__main__":
                 break
             d = json.loads(line)
             claims, err = draft_claims(d, prov, seed=i)
+            if type(prov).__name__ == "GeminiProvider":
+                import time; time.sleep(4.5)
             r = verify(d, claims)
 
             tot_claims += r["n_claims"]

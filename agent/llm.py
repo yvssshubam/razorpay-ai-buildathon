@@ -20,6 +20,23 @@ import os
 import random
 import urllib.error
 import urllib.request
+def _load_dotenv():
+    """Read .env from the repo root into os.environ, without overwriting
+    anything already set. A shell-set variable therefore still wins, which
+    keeps the CB_LLM and CB_FAULT_RATE sweeps working."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_dotenv()
 
 TIMEOUT = 90
 
