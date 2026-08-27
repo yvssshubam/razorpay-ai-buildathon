@@ -1,0 +1,194 @@
+[
+  {
+    "policy": "contest_all",
+    "contest_cost": 250.0,
+    "completeness": 1.0,
+    "hallucination": 0.0,
+    "precision_winnable": 0.369,
+    "recall_winnable": 1.0,
+    "precision_ev": 0.606,
+    "recall_ev": 1.0,
+    "cost_wrong": {
+      "paid_to_lose": 313450.0,
+      "left_behind": 0.0,
+      "total": 313450.0
+    },
+    "net_rupees": 212946.67,
+    "outcome_mix": {
+      "submitted": 522,
+      "accepted": 0,
+      "escalated": 278
+    },
+    "human_queue": 278,
+    "per_tier": {
+      "A": {
+        "n": 138,
+        "precision_winnable": 0.833,
+        "recall_winnable": 1.0,
+        "precision_ev": 0.92,
+        "recall_ev": 1.0,
+        "net_rupees": 243664.61
+      },
+      "B": {
+        "n": 138,
+        "precision_winnable": 0.507,
+        "recall_winnable": 1.0,
+        "precision_ev": 0.819,
+        "recall_ev": 1.0,
+        "net_rupees": 128817.77
+      },
+      "C": {
+        "n": 246,
+        "precision_winnable": 0.341,
+        "recall_winnable": 1.0,
+        "precision_ev": 0.728,
+        "recall_ev": 1.0,
+        "net_rupees": -1142.97
+      },
+      "D": {
+        "n": 155,
+        "precision_winnable": 0.135,
+        "recall_winnable": 1.0,
+        "precision_ev": 0.342,
+        "recall_ev": 1.0,
+        "net_rupees": -37383.99
+      },
+      "E": {
+        "n": 123,
+        "precision_winnable": 0.041,
+        "recall_winnable": 1.0,
+        "precision_ev": 0.106,
+        "recall_ev": 1.0,
+        "net_rupees": -121008.75
+      }
+    }
+  },
+  {
+    "policy": "contest_none",
+    "contest_cost": 250.0,
+    "completeness": null,
+    "hallucination": null,
+    "precision_winnable": 0.0,
+    "recall_winnable": 0.0,
+    "precision_ev": 0.0,
+    "recall_ev": 0.0,
+    "cost_wrong": {
+      "paid_to_lose": 0.0,
+      "left_behind": 655908.8,
+      "total": 655908.8
+    },
+    "net_rupees": 0.0,
+    "outcome_mix": {
+      "submitted": 0,
+      "accepted": 800,
+      "escalated": 0
+    },
+    "human_queue": 0,
+    "per_tier": {
+      "A": {
+        "n": 138,
+        "precision_winnable": 0.0,
+        "recall_winnable": 0.0,
+        "precision_ev": 0.0,
+        "recall_ev": 0.0,
+        "net_rupees": 0.0
+      },
+      "B": {
+        "n": 138,
+        "precision_winnable": 0.0,
+        "recall_winnable": 0.0,
+        "precision_ev": 0.0,
+        "recall_ev": 0.0,
+        "net_rupees": 0.0
+      },
+      "C": {
+        "n": 246,
+        "precision_winnable": 0.0,
+        "recall_winnable": 0.0,
+        "precision_ev": 0.0,
+        "recall_ev": 0.0,
+        "net_rupees": 0.0
+      },
+      "D": {
+        "n": 155,
+        "precision_winnable": 0.0,
+        "recall_winnable": 0.0,
+        "precision_ev": 0.0,
+        "recall_ev": 0.0,
+        "net_rupees": 0.0
+      },
+      "E": {
+        "n": 123,
+        "precision_winnable": 0.0,
+        "recall_winnable": 0.0,
+        "precision_ev": 0.0,
+        "recall_ev": 0.0,
+        "net_rupees": 0.0
+      }
+    }
+  },
+  {
+    "policy": "agent",
+    "contest_cost": 250.0,
+    "completeness": 1.0,
+    "hallucination": 0.0,
+    "precision_winnable": 0.41,
+    "recall_winnable": 0.793,
+    "precision_ev": 0.809,
+    "recall_ev": 0.953,
+    "cost_wrong": {
+      "paid_to_lose": 185850.0,
+      "left_behind": 24942.2,
+      "total": 210792.2
+    },
+    "net_rupees": 345630.79,
+    "outcome_mix": {
+      "submitted": 416,
+      "accepted": 229,
+      "escalated": 155
+    },
+    "human_queue": 155,
+    "per_tier": {
+      "A": {
+        "n": 138,
+        "precision_winnable": 0.833,
+        "recall_winnable": 0.87,
+        "precision_ev": 1.0,
+        "recall_ev": 0.945,
+        "net_rupees": 244349.65
+      },
+      "B": {
+        "n": 138,
+        "precision_winnable": 0.491,
+        "recall_winnable": 0.786,
+        "precision_ev": 0.991,
+        "recall_ev": 0.982,
+        "net_rupees": 131286.6
+      },
+      "C": {
+        "n": 246,
+        "precision_winnable": 0.352,
+        "recall_winnable": 0.738,
+        "precision_ev": 0.943,
+        "recall_ev": 0.927,
+        "net_rupees": 42842.09
+      },
+      "D": {
+        "n": 155,
+        "precision_winnable": 0.156,
+        "recall_winnable": 0.714,
+        "precision_ev": 0.552,
+        "recall_ev": 1.0,
+        "net_rupees": -7947.45
+      },
+      "E": {
+        "n": 123,
+        "precision_winnable": 0.03,
+        "recall_winnable": 0.4,
+        "precision_ev": 0.179,
+        "recall_ev": 0.923,
+        "net_rupees": -64900.09
+      }
+    }
+  }
+]

@@ -1,0 +1,72 @@
+[
+  {
+    "cost": 50,
+    "contest_all": 372946.67,
+    "contest_none": 0.0,
+    "agent": 386299.44,
+    "winner": "agent"
+  },
+  {
+    "cost": 100,
+    "contest_all": 332946.67,
+    "contest_none": 0.0,
+    "agent": 371125.97,
+    "winner": "agent"
+  },
+  {
+    "cost": 200,
+    "contest_all": 252946.67,
+    "contest_none": 0.0,
+    "agent": 355822.56,
+    "winner": "agent"
+  },
+  {
+    "cost": 350,
+    "contest_all": 132946.67,
+    "contest_none": 0.0,
+    "agent": 321330.55,
+    "winner": "agent"
+  },
+  {
+    "cost": 500,
+    "contest_all": 12946.67,
+    "contest_none": 0.0,
+    "agent": 280519.36,
+    "winner": "agent"
+  },
+  {
+    "cost": 750,
+    "contest_all": -187053.33,
+    "contest_none": 0.0,
+    "agent": 231674.76,
+    "winner": "agent"
+  },
+  {
+    "cost": 1000,
+    "contest_all": -387053.33,
+    "contest_none": 0.0,
+    "agent": 191638.65,
+    "winner": "agent"
+  },
+  {
+    "cost": 1500,
+    "contest_all": -787053.33,
+    "contest_none": 0.0,
+    "agent": 126166.64,
+    "winner": "agent"
+  },
+  {
+    "cost": 2000,
+    "contest_all": -1187053.33,
+    "contest_none": 0.0,
+    "agent": 96816.72,
+    "winner": "agent"
+  },
+  {
+    "cost": 3000,
+    "contest_all": -1987053.33,
+    "contest_none": 0.0,
+    "agent": 52633.29,
+    "winner": "agent"
+  }
+]

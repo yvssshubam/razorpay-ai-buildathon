@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Regenerable from the frozen, seeded generator
+data/*.jsonl
+models/*.pkl
+
+# Keep IEEE-CIS out of git (large)
+*.csv
+
+# Results ARE the deliverable and stay tracked:
+# data/*.json, data/*.png

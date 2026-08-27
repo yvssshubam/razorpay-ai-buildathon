@@ -1,0 +1,451 @@
+# Chargeback reason code -> evidence rulebook.
+#
+# VERIFIED against https://razorpay.com/docs/payments/disputes/submit-evidence/
+# and https://razorpay.com/docs/api/disputes/contest/ on 2026-08-27.
+#
+# TWO CAVEATS, both load-bearing:
+#
+# 1. Razorpay labels these "Suggested Documents", not required documents. This
+#    rulebook treats the full suggested list as the completeness bar. That is
+#    OUR modelling choice, made because a partial packet is the failure mode
+#    worth measuring. It is not a claim about what the networks mandate.
+#
+# 2. The api_field mapping is OUR INFERENCE. Razorpay publishes the suggested
+#    documents and, separately, the fixed evidence slots the contest API
+#    accepts. It does not publish a mapping between them. Every api_field below
+#    is our judgement about which slot a document belongs in. Flagged here
+#    because a reviewer from Razorpay will know their docs do not contain it.
+
+meta:
+  version: 2
+  verified_on: 2026-08-27
+  sources:
+    - https://razorpay.com/docs/payments/disputes/submit-evidence/
+    - https://razorpay.com/docs/api/disputes/contest/
+  supersedes: >
+    v1 was transcribed from memory and contained errors: RZP01 was modelled as
+    a duplicate-charge code (it is goods-not-provided), Visa 13.1 included an
+    avs_result item that does not appear in the docs, and 1064 required an
+    ip_record that does not exist. Corrected here; generator regenerated.
+
+# The evidence slots the contest API actually accepts. A packet that does not
+# map onto these fields cannot be submitted, however complete it looks.
+api_evidence_fields:
+  - shipping_proof
+  - billing_proof
+  - cancellation_proof
+  - customer_communication
+  - proof_of_service
+  - explanation_letter
+  - refund_confirmation
+  - access_activity_log
+  - refund_cancellation_policy
+  - term_and_conditions
+  - others            # takes {type, document_ids}
+
+codes:
+
+  # ---------------- UPI ----------------
+  "1061":
+    network: upi
+    category: customer_dispute
+    description: Refund not processed after cancellation or return.
+    required_evidence:
+      refund_generation_proof: refund_confirmation
+      bank_statement_matching_amount: refund_confirmation
+      customer_refund_confirmation: customer_communication
+      refund_policy: refund_cancellation_policy
+
+  "1062":
+    network: upi
+    category: customer_dispute
+    description: Goods or services differed materially from the description.
+    required_evidence:
+      product_description_screenshots: others
+      delivery_proof: proof_of_service
+      customer_dissatisfaction_comms: customer_communication
+      return_policy: refund_cancellation_policy
+
+  "1064":
+    network: upi
+    category: customer_dispute
+    description: Goods or services never delivered.
+    required_evidence:
+      delivery_proof: proof_of_service
+      customer_interaction_records: customer_communication
+      terms_and_conditions: term_and_conditions
+
+  # ---------------- Visa ----------------
+  "13.1":
+    network: visa
+    category: customer_dispute
+    description: Merchandise or services not received.
+    required_evidence:
+      delivery_confirmation_signed: shipping_proof
+      tracking_information: shipping_proof
+      service_completion_records: proof_of_service
+      digital_delivery_logs: access_activity_log
+      customer_acknowledgement: customer_communication
+
+  "13.2":
+    network: visa
+    category: customer_dispute
+    description: Recurring charge after the customer cancelled.
+    required_evidence:
+      cancellation_policy: refund_cancellation_policy
+      no_cancellation_request_proof: cancellation_proof
+      continued_usage_logs: access_activity_log
+      terms_of_service: term_and_conditions
+      cancellation_window_proof: refund_cancellation_policy
+
+  "13.3":
+    network: visa
+    category: customer_dispute
+    description: Item not as described or defective.
+    required_evidence:
+      product_description_images: others
+      quality_control_records: others
+      no_return_received: others
+      no_customer_contact_proof: customer_communication
+      terms_and_conditions: term_and_conditions
+
+  "13.4":
+    network: visa
+    category: customer_dispute
+    description: Counterfeit merchandise.
+    required_evidence:
+      authenticity_certificates: others
+      supplier_verification: others
+      brand_authorisation: others
+      product_source_documentation: others
+      quality_guarantees: explanation_letter
+
+  "13.5":
+    network: visa
+    category: customer_dispute
+    description: Terms of sale misrepresented.
+    required_evidence:
+      marketing_materials: others
+      clear_terms_display: term_and_conditions
+      customer_acknowledgement: customer_communication
+      no_misleading_claims_proof: explanation_letter
+      contract_terms: term_and_conditions
+
+  "13.6":
+    network: visa
+    category: customer_dispute
+    description: Promised refund or credit never processed.
+    required_evidence:
+      refund_processing_proof: refund_confirmation
+      credit_timestamp: refund_confirmation
+      return_not_received: others
+      refund_policy_compliance: refund_cancellation_policy
+      transaction_reversal_records: refund_confirmation
+
+  "13.7":
+    network: visa
+    category: customer_dispute
+    description: Charged despite cancellation before shipment.
+    required_evidence:
+      no_cancellation_received: cancellation_proof
+      cancellation_policy_terms: refund_cancellation_policy
+      order_already_shipped: shipping_proof
+      cancellation_window_missed: refund_cancellation_policy
+      terms_agreement: term_and_conditions
+
+  "13.8":
+    network: visa
+    category: processing_error
+    description: Original Credit Transaction rejected by the network.
+    required_evidence:
+      valid_account_verification: billing_proof
+      oct_rules_compliance: explanation_letter
+      alternative_refund_method: refund_confirmation
+      transaction_approval_records: billing_proof
+
+  # ---------------- Mastercard ----------------
+  "4841":
+    network: mastercard
+    category: customer_dispute
+    description: Recurring or digital goods charge after cancellation.
+    required_evidence:
+      cancellation_policy: refund_cancellation_policy
+      no_cancellation_received: cancellation_proof
+      service_usage_after_date: access_activity_log
+      terms_of_service: term_and_conditions
+      digital_access_logs: access_activity_log
+
+  "4850":
+    network: mastercard
+    category: processing_error
+    description: Instalment plan terms or schedule violated.
+    required_evidence:
+      installment_agreement: term_and_conditions
+      payment_schedule: billing_proof
+      terms_compliance: term_and_conditions
+      customer_consent: customer_communication
+      billing_records: billing_proof
+
+  "4853":
+    network: mastercard
+    category: customer_dispute
+    description: General cardholder dispute; evidence varies by underlying claim.
+    variable_requirements: true
+    required_evidence:
+      delivery_proof: proof_of_service
+      quality_records: others
+      product_description: others
+      return_policy: refund_cancellation_policy
+      customer_communication_records: customer_communication
+
+  "4854":
+    network: mastercard
+    category: customer_dispute
+    description: Cardholder dispute not elsewhere classified.
+    variable_requirements: true
+    required_evidence:
+      valid_transaction_proof: billing_proof
+      delivery_or_service_proof: proof_of_service
+      customer_agreement: term_and_conditions
+
+  # ---------------- RuPay ----------------
+  "RUPAY-1061":
+    network: rupay
+    category: customer_dispute
+    description: Refund not processed after cancellation or return.
+    required_evidence:
+      refund_generation_proof: refund_confirmation
+      bank_statement_matching_amount: refund_confirmation
+      customer_refund_confirmation: customer_communication
+      refund_policy: refund_cancellation_policy
+
+  "RUPAY-1062":
+    network: rupay
+    category: customer_dispute
+    description: Goods differed from description or were defective.
+    required_evidence:
+      product_description_screenshots: others
+      delivery_proof: proof_of_service
+      customer_dissatisfaction_comms: customer_communication
+      return_policy: refund_cancellation_policy
+
+  "RUPAY-1064":
+    network: rupay
+    category: customer_dispute
+    description: Goods or services never provided.
+    required_evidence:
+      delivery_proof: proof_of_service
+      customer_interaction_records: customer_communication
+      terms_and_conditions: term_and_conditions
+
+  "1101":
+    network: rupay
+    category: processing_error
+    description: Illegible documents submitted against a retrieval request.
+    required_evidence:
+      delivery_proof: proof_of_service
+      customer_interaction_records: customer_communication
+      terms_and_conditions: term_and_conditions
+
+  "1102":
+    network: rupay
+    category: processing_error
+    description: Retrieval request not fulfilled in time.
+    required_evidence:
+      delivery_proof: proof_of_service
+      customer_interaction_records: customer_communication
+      terms_and_conditions: term_and_conditions
+
+  "1103":
+    network: rupay
+    category: processing_error
+    description: Invalid documents submitted against a retrieval request.
+    required_evidence:
+      delivery_proof: proof_of_service
+      customer_interaction_records: customer_communication
+      terms_and_conditions: term_and_conditions
+
+  # ---------------- American Express ----------------
+  "C02":
+    network: amex
+    category: customer_dispute
+    description: Promised credit or refund never processed.
+    required_evidence:
+      credit_issuance_proof: refund_confirmation
+      refund_date_and_amount: refund_confirmation
+      return_not_received: others
+      policy_compliance: refund_cancellation_policy
+      processing_confirmation: refund_confirmation
+
+  "C04":
+    network: amex
+    category: customer_dispute
+    description: Goods returned or service refused, no refund issued.
+    required_evidence:
+      return_not_received: others
+      refusal_not_documented: explanation_letter
+      restocking_completed: others
+      return_policy_terms: refund_cancellation_policy
+      delivery_confirmation: shipping_proof
+
+  "C05":
+    network: amex
+    category: customer_dispute
+    description: Goods or services cancelled, no refund issued.
+    required_evidence:
+      no_cancellation_received: cancellation_proof
+      cancellation_policy: refund_cancellation_policy
+      already_shipped_or_provided: shipping_proof
+      cancellation_deadline_passed: refund_cancellation_policy
+      terms_proof: term_and_conditions
+
+  "C08":
+    network: amex
+    category: customer_dispute
+    description: Goods or services not received.
+    required_evidence:
+      delivery_confirmation: shipping_proof
+      tracking_proof: shipping_proof
+      service_completion: proof_of_service
+      digital_delivery_logs: access_activity_log
+      customer_signature: others
+
+  "C14":
+    network: amex
+    category: processing_error
+    description: Customer claims the charge was already settled by other means.
+    required_evidence:
+      single_payment_proof: billing_proof
+      no_alternative_payment: explanation_letter
+      payment_reconciliation: billing_proof
+      customer_communication_records: customer_communication
+      order_records: billing_proof
+
+  "C18":
+    network: amex
+    category: customer_dispute
+    description: No-show fee disputed for a hotel or rental reservation.
+    required_evidence:
+      no_show_policy_disclosure: refund_cancellation_policy
+      cancellation_window: refund_cancellation_policy
+      policy_agreement: term_and_conditions
+      reservation_confirmation: billing_proof
+      terms_acceptance: term_and_conditions
+
+  "C28":
+    network: amex
+    category: customer_dispute
+    description: Recurring billing continued after cancellation.
+    required_evidence:
+      no_cancellation_received: cancellation_proof
+      cancellation_policy: refund_cancellation_policy
+      continued_usage: access_activity_log
+      service_access_logs: access_activity_log
+      terms_of_service: term_and_conditions
+
+  "C31":
+    network: amex
+    category: customer_dispute
+    description: Goods or services not as described.
+    required_evidence:
+      accurate_description: others
+      photos_and_specifications: others
+      quality_standards_met: others
+      no_complaint_received: customer_communication
+      terms_compliance: term_and_conditions
+
+  "C32":
+    network: amex
+    category: customer_dispute
+    description: Goods damaged or defective on arrival.
+    required_evidence:
+      quality_control_records: others
+      no_damage_claim: customer_communication
+      shipping_insurance: shipping_proof
+      packaging_adequacy: others
+      no_return_received: others
+
+  "M01":
+    network: amex
+    category: authorisation_error
+    description: Merchant allegedly pre-agreed to the chargeback.
+    required_evidence:
+      no_prior_agreement: explanation_letter
+      chargeback_authorisation_invalid: explanation_letter
+      dispute_documentation: others
+      no_consent_given: customer_communication
+
+  "M10":
+    network: amex
+    category: customer_dispute
+    description: Vehicle rental damage charges disputed.
+    required_evidence:
+      damage_documentation: others
+      pre_rental_inspection: others
+      timestamped_photos: others
+      rental_agreement: term_and_conditions
+      insurance_coverage: others
+
+  "M49":
+    network: amex
+    category: customer_dispute
+    description: Vehicle theft or loss-of-use charges disputed.
+    required_evidence:
+      police_report: others
+      theft_documentation: others
+      contract_terms: term_and_conditions
+      insurance_claims: others
+      loss_mitigation_efforts: explanation_letter
+
+  # ---------------- Razorpay ----------------
+  "RZP00":
+    network: razorpay
+    category: customer_dispute
+    description: Dispute fits no existing category.
+    variable_requirements: true
+    required_evidence:
+      delivery_proof_committed_timeline: shipping_proof
+      invoicing_details: billing_proof
+      customer_email_communication: customer_communication
+      refund_details: refund_confirmation
+
+  "RZP01":
+    network: razorpay
+    category: customer_dispute
+    description: Customer paid but goods or services were never provided.
+    required_evidence:
+      delivery_proof: proof_of_service
+      customer_interaction_records: customer_communication
+      terms_and_conditions: term_and_conditions
+
+  "RZP04":
+    network: razorpay
+    category: customer_dispute
+    description: Promised refund never processed.
+    required_evidence:
+      refund_generation_proof: refund_confirmation
+      bank_statement_matching_amount: refund_confirmation
+      customer_refund_confirmation: customer_communication
+      refund_policy: refund_cancellation_policy
+
+  "RZP05":
+    network: razorpay
+    category: processing_error
+    description: Account debited but no transaction confirmation sent.
+    required_evidence:
+      service_invoice: billing_proof
+      internal_payment_logs: access_activity_log
+      customer_interaction_records: customer_communication
+      terms_and_conditions: term_and_conditions
+
+  "RZP06":
+    network: razorpay
+    category: customer_dispute
+    description: Business failed to respond to post-transaction queries.
+    note: >
+      Razorpay's docs specify email communication and explicitly exclude
+      WhatsApp for this code.
+    required_evidence:
+      delivery_proof_committed_timeline: shipping_proof
+      invoicing_details: billing_proof
+      customer_email_communication: customer_communication

@@ -1,0 +1,139 @@
+"""Provider interface for Stage 3 drafting.
+
+Three backends, selected by CB_LLM:
+
+  mock    No network. Emits well-formed claims from the artifacts, and
+          fabricates a CB_FAULT_RATE fraction of them -- citing artifact IDs
+          that do not exist, or asserting facts the artifact does not contain.
+          This is how the verifier is TESTED. A verifier that has never been
+          shown a fabrication is an untested gate.
+
+  ollama  Local model for development. No API key, no per-call cost.
+  gemini  Hosted model for the final measurement run.
+
+The mock is not a stand-in for measurement. Hallucination rate reported from
+the mock is a number you chose. Only the real backends measure anything, and
+the README must say which backend produced the headline figure.
+"""
+import json
+import os
+import random
+import urllib.error
+import urllib.request
+
+TIMEOUT = 90
+
+
+class LLMError(RuntimeError):
+    pass
+
+
+def _post(url, payload, headers=None):
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=body,
+        headers={"Content-Type": "application/json", **(headers or {})})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise LLMError(f"{e.code}: {e.read().decode('utf-8')[:400]}") from e
+    except urllib.error.URLError as e:
+        raise LLMError(f"unreachable: {e.reason}") from e
+
+
+def _strip_fences(text):
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else t
+        t = t.rsplit("```", 1)[0]
+    return t.strip()
+
+
+class MockProvider:
+    """Deterministic per dispute, so a rerun reproduces the same faults."""
+
+    def __init__(self, fault_rate=None):
+        self.fault_rate = float(
+            os.environ.get("CB_FAULT_RATE", 0.15 if fault_rate is None else fault_rate))
+
+    def draft(self, system, user, seed=0):
+        ctx = json.loads(user)
+        rng = random.Random(seed)
+        arts = ctx["artifacts"]
+        claims = []
+        for aid, a in arts.items():
+            if not a.get("present"):
+                continue
+            if rng.random() < self.fault_rate:
+                mode = rng.choice(["bad_id", "bad_fact"])
+                if mode == "bad_id":
+                    claims.append({
+                        "text": f"A {a['kind']} record confirms the transaction.",
+                        "artifact_id": f"{aid}_X",
+                        "asserts_kind": a["kind"],
+                    })
+                else:
+                    claims.append({
+                        "text": f"The {a['kind']} record was signed by the cardholder.",
+                        "artifact_id": aid,
+                        "asserts_kind": "signed_delivery_confirmation",
+                    })
+            else:
+                claims.append({
+                    "text": f"A {a['kind']} record dated day {a.get('created_day')} "
+                            f"supports this representment.",
+                    "artifact_id": aid,
+                    "asserts_kind": a["kind"],
+                })
+        return json.dumps({"claims": claims})
+
+
+class OllamaProvider:
+    def __init__(self, model=None, host=None):
+        self.model = model or os.environ.get("CB_LLM_MODEL", "llama3.1:8b")
+        self.host = host or os.environ.get("CB_OLLAMA_HOST", "http://localhost:11434")
+
+    def draft(self, system, user, seed=0):
+        out = _post(f"{self.host}/api/chat", {
+            "model": self.model,
+            "format": "json",
+            "stream": False,
+            "options": {"temperature": 0.2, "seed": seed},
+            "messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": user}],
+        })
+        return _strip_fences(out["message"]["content"])
+
+
+class GeminiProvider:
+    def __init__(self, model=None, api_key=None):
+        self.model = model or os.environ.get("CB_LLM_MODEL", "gemini-3.6-flash")
+        self.key = api_key or os.environ.get("GEMINI_API_KEY")
+        if not self.key:
+            raise LLMError("GEMINI_API_KEY is not set")
+
+    def draft(self, system, user, seed=0):
+        url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+               f"{self.model}:generateContent?key={self.key}")
+        out = _post(url, {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": {"temperature": 0.2,
+                                 "responseMimeType": "application/json"},
+        })
+        try:
+            return _strip_fences(out["candidates"][0]["content"]["parts"][0]["text"])
+        except (KeyError, IndexError):
+            raise LLMError(f"unexpected response shape: {str(out)[:400]}")
+
+
+def get_provider(name=None):
+    name = (name or os.environ.get("CB_LLM", "mock")).lower()
+    if name == "mock":
+        return MockProvider()
+    if name == "ollama":
+        return OllamaProvider()
+    if name == "gemini":
+        return GeminiProvider()
+    raise LLMError(f"unknown provider: {name}")
