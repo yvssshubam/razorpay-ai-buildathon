@@ -17,16 +17,45 @@
 #    because a reviewer from Razorpay will know their docs do not contain it.
 
 meta:
-  version: 2
+  version: 3
   verified_on: 2026-08-27
   sources:
     - https://razorpay.com/docs/payments/disputes/submit-evidence/
     - https://razorpay.com/docs/api/disputes/contest/
+
+  # Provenance applies per entry. Codes carry razorpay_docs unless they say
+  # otherwise, so only the exceptions are tagged.
+  default_provenance: razorpay_docs
+  provenance_levels:
+    razorpay_docs: >
+      Verified against Razorpay's submit-evidence page on 2026-08-27.
+      Authoritative for this project.
+    network_docs: >
+      PROVISIONAL. Razorpay's page groups codes under four category tabs
+      (Customer Dispute, Fraud, Authorisation Error, Processing Error). Only
+      the Customer Dispute tab was retrievable, so fraud and processing-error
+      codes here are compiled from card-network reason-code documentation via
+      third-party references and are NOT confirmed against Razorpay's own
+      mapping. Anything measured against these entries carries that caveat.
+
+  caveat_suggested_not_required: >
+    Razorpay labels these "Suggested Documents", not required documents. This
+    rulebook treats the full suggested list as the completeness bar. That is
+    our modelling choice, made because a partial packet is the failure mode
+    worth measuring, not a claim about what the networks mandate.
+
+  caveat_api_mapping: >
+    The api_field mapping is our inference. Razorpay publishes the suggested
+    documents and, separately, the evidence slots the contest API accepts. It
+    does not publish a mapping between them.
+
   supersedes: >
-    v1 was transcribed from memory and contained errors: RZP01 was modelled as
-    a duplicate-charge code (it is goods-not-provided), Visa 13.1 included an
-    avs_result item that does not appear in the docs, and 1064 required an
-    ip_record that does not exist. Corrected here; generator regenerated.
+    v1 was transcribed from memory: RZP01 was modelled as a duplicate-charge
+    code (it is goods-not-provided), Visa 13.1 required a non-existent
+    avs_result, and 1064 required an ip_record that does not exist. v2
+    corrected those but covered only the Customer Dispute tab and omitted the
+    fraud codes the case taxonomy depends on. v3 adds them under a separate
+    provenance level rather than presenting them as equally verified.
 
 # The evidence slots the contest API actually accepts. A packet that does not
 # map onto these fields cannot be submitted, however complete it looks.
@@ -449,3 +478,49 @@ codes:
       delivery_proof_committed_timeline: shipping_proof
       invoicing_details: billing_proof
       customer_email_communication: customer_communication
+    # ---------------- Fraud and processing (PROVISIONAL) ----------------
+  "10.4":
+    network: visa
+    category: fraud
+    provenance: network_docs
+    description: Other fraud, card-absent environment. Cardholder denies authorising a card-not-present transaction.
+    required_evidence:
+      avs_cvv_match_records: billing_proof
+      authentication_log: others
+      device_and_ip_records: access_activity_log
+      prior_undisputed_transaction_link: others
+      delivery_to_matched_address: shipping_proof
+
+  "12.5":
+    network: visa
+    category: processing_error
+    provenance: network_docs
+    description: Incorrect amount charged relative to what was authorised or agreed.
+    required_evidence:
+      authorisation_amount_record: billing_proof
+      settlement_amount_record: billing_proof
+      itemised_invoice: billing_proof
+      customer_agreed_pricing: term_and_conditions
+
+  "12.6":
+    network: visa
+    category: processing_error
+    provenance: network_docs
+    description: Duplicate processing; the same transaction charged more than once.
+    required_evidence:
+      distinct_authorisation_records: billing_proof
+      distinct_fulfilment_records: proof_of_service
+      settlement_reconciliation: billing_proof
+      no_duplicate_refund_issued: refund_confirmation
+
+  "4837":
+    network: mastercard
+    category: fraud
+    provenance: network_docs
+    description: No cardholder authorisation.
+    required_evidence:
+      avs_cvc_match_records: billing_proof
+      authentication_log: others
+      device_and_ip_records: access_activity_log
+      prior_undisputed_transaction_link: others
+      delivery_confirmation: shipping_proof    
