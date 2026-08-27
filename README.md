@@ -26,12 +26,10 @@ The agent recovers **₹236,153 more than contesting everything** — 1.8× the
 return on the same 800 disputes — while submitting fewer packets (392 vs 484)
 and sending one sixth as many to a human (50 vs 316).
 
-**A note on two columns.** `complete` and `halluc` do not appear in the table
-above, and deliberately so: the policy scorer in `eval/baselines.py` builds
-packets with a deterministic builder rather than calling Stages 3 and 4, so
-those two metrics would be arithmetic rather than measurements there. They are
-measured separately, on the real drafting and verification path, in the verifier
-section below.
+**Where completeness and hallucination are measured.** The policy scorer in
+`eval/baselines.py` assembles packets deterministically rather than calling
+Stages 3 and 4, so those two metrics belong to the verifier section below, where
+they are measured on the real drafting path.
 
 **Two precision numbers, deliberately.** *Winnable* precision asks whether we
 would have won. *EV* precision asks whether contesting was worth attempting at
@@ -58,7 +56,9 @@ expected-value reading would contest. Industry data puts the representment win
 rate for true fraud chargebacks at 9.27%; for a class of disputes that wins
 roughly one time in eleven, at a cost per attempt, the correct action is to
 accept immediately and stop spending. The agent reaches that from observable
-features alone — it never sees the tier.
+features alone — it never sees the tier.The EV precision of 1.00 in that row is not a
+contradiction: every Tier E case the agent did contest was positive-expected-value
+at the time of the decision. Correct by the rule, and still a loss.
 
 The residual −₹3,150 is honest and worth stating: with a heavy-tailed amount
 distribution, a 5% chance on a ₹80,000 dispute clears a ₹250 threshold on
