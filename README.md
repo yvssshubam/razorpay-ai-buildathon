@@ -151,7 +151,7 @@ earns its keep.
 ---
 
 ## 2. The pipeline
-
+![Pipeline architecture](docs/architecture.svg)
 Input is a dispute. Output is a decision, a verified packet, and a log line.
 
 **Stage 1 — Triage.** A calibrated gradient-boosted classifier scores p(win)
