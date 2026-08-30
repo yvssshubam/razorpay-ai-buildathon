@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+pyyaml>=6.0
+# the pipeline itself
+scikit-learn
+numpy
