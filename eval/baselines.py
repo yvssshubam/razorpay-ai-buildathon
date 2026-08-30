@@ -143,7 +143,7 @@ def agent(dispute, contest_cost=None):
     gross = p * dispute["amount"] * dist.NET_RECOVERY_FRACTION
 
     if blocked:
-        ev = gross * dist.HUMAN_RESOLVE_RATE - dist.HUMAN_REVIEW_COST
+        ev = gross * dist.HUMAN_RESOLVE_RATE - (cc + dist.HUMAN_REVIEW_COST)
     else:
         ev = gross - cc
 

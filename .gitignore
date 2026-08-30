@@ -12,3 +12,9 @@ models/*.pkl
 
 # Results ARE the deliverable and stay tracked:
 # data/*.json, data/*.png
+
+# Node / Vite
+node_modules/
+webapp/dist/
+webapp/.vite/
+*.log

@@ -1,6 +1,6 @@
-Cost constant sweep -- 2026-08-27
-Holdout: data/holdout.jsonl (n=800). Rulebook v3. Amounts resampled from IEEE-CIS.
-Learned p(win) (calibrated classifier, AUC 0.800, ECE 0.0285).
+Cost constant sweep -- rulebook v3, amounts resampled from IEEE-CIS,
+escalation priced at CONTEST_COST + HUMAN_REVIEW_COST.
+Holdout: data/holdout.jsonl (n=800). Calibrated classifier, AUC 0.800, ECE 0.0285.
 
 One constant varied at a time; the other three held at their defaults. Both the
 decision path (generator/distributions.py) and the scoring path
@@ -12,58 +12,59 @@ defaults: {'CONTEST_COST': 250.0, 'HUMAN_REVIEW_COST': 800.0, 'NET_RECOVERY_FRAC
 
 === CONTEST_COST (default 250.0) ===
      value        agent  contest_all       margin
-       100      608,736      413,402      195,334
-       175      572,101      353,402      218,699
-       250      529,555      293,402      236,153
-       400      469,085      173,402      295,683
-       600      390,104       13,402      376,702
-       900      309,846     -226,598      536,444
+       100      605,729      413,402      192,327
+       175      570,669      353,402      217,267
+       250      526,279      293,402      232,877
+       400      474,243      173,402      300,841
+       600      406,626       13,402      393,224
+       900      335,964     -226,598      562,562
 
 === HUMAN_REVIEW_COST (default 800.0) ===
      value        agent  contest_all       margin
-       300      538,889      451,402       87,487
-       500      531,292      388,202      143,090
-       800      529,555      293,402      236,153
-      1200      519,463      167,002      352,461
-      1800      506,871      -22,598      529,469
-      2500      506,978     -243,798      750,776
+       300      549,581      451,402       98,179
+       500      543,055      388,202      154,853
+       800      526,279      293,402      232,877
+      1200      525,523      167,002      358,521
+      1800      517,121      -22,598      539,719
+      2500      511,300     -243,798      755,098
 
 === NET_RECOVERY_FRACTION (default 0.85) ===
      value        agent  contest_all       margin
-       0.5      269,135      -13,858      282,993
-      0.65      369,723      117,825      251,898
-       0.8      488,836      249,508      239,328
-       0.9      572,482      337,296      235,185
-       1.0      649,924      425,085      224,840
+       0.5      265,658      -13,858      279,516
+      0.65      380,312      117,825      262,487
+       0.8      490,523      249,508      241,015
+       0.9      571,124      337,296      233,828
+       1.0      650,516      425,085      225,431
 
 === HUMAN_RESOLVE_RATE (default 0.8) ===
      value        agent  contest_all       margin
        0.2      508,338      203,586      304,752
-      0.35      505,716      226,040      279,676
-       0.5      512,753      248,494      264,259
-      0.65      516,798      270,948      245,851
-       0.8      529,555      293,402      236,153
+      0.35      509,154      226,040      283,114
+       0.5      517,690      248,494      269,196
+      0.65      523,358      270,948      252,410
+       0.8      526,279      293,402      232,877
 
 ============================================================
 Agent beats contest-all across every value tested for:
 CONTEST_COST, HUMAN_REVIEW_COST, NET_RECOVERY_FRACTION, HUMAN_RESOLVE_RATE
 
+
 READING THE RESULT
 ------------------
 The agent wins everywhere, but the more useful finding is the difference in
-SENSITIVITY. The agent escalates 50 packets; contest-all escalates 316.
+SENSITIVITY. The agent escalates 38 packets; contest-all escalates 316.
 
   HUMAN_REVIEW_COST  Rs 300 -> Rs 2500 (8x)
-    agent        538,889 -> 506,978    (-5.9%)
+    agent        549,581 -> 511,300    (-7.0%)
     contest_all  451,402 -> -243,798   (turns negative at 1800)
 
   HUMAN_RESOLVE_RATE  0.2 -> 0.8 (4x)
-    agent        508,338 -> 529,555    (+4.2%)
+    agent        508,338 -> 526,279    (+3.5%)
     contest_all  203,586 -> 293,402    (+44.1%)
 
 Contest-all turns negative in three of the four sweeps: at CONTEST_COST 900,
 at HUMAN_REVIEW_COST 1800, and at NET_RECOVERY_FRACTION 0.5. The agent never
-does; its worst value anywhere is Rs 269,135.
+does; its worst value anywhere is Rs 265,658.
 
 These four constants were chosen, not measured. The point of the sweep is that
 the ordering does not depend on having chosen them correctly -- and that the
@@ -71,8 +72,29 @@ agent's rupee figure is far less exposed to them than contest-all's is. Where
 the true values are unknown, that stability is itself the argument.
 
 NET_RECOVERY_FRACTION behaves as expected: the margin compresses as recovery
-improves (282,993 at 0.5 down to 224,840 at 1.0), because full recovery makes
-indiscriminate contesting more attractive. The agent's advantage is largest
-when recovery is poor, which is the realistic case -- industry net recovery
-after second-cycle chargebacks and representment costs is reported at 12-18%
-(US/global; see README "Data and its limits").
+improves (279,516 at 0.5 down to 225,431 at 1.0), because full recovery makes
+indiscriminate contesting more attractive. Note that this constant is the share
+recovered GIVEN a win -- not the portfolio net-recovery figure quoted in
+industry reports, which already contains the win rate and is not comparable
+to it.
+
+A fifth constant, AMOUNT_MEDIAN, is NOT swept here: varying it requires
+regenerating the datasets and retraining rather than rescoring. It is disclosed
+as a stated assumption in the README instead.
+
+
+WHAT CHANGED SINCE THE PREVIOUS RUN
+-----------------------------------
+The EV rule previously priced a blocked packet at HUMAN_REVIEW_COST alone,
+while eval/metrics.py charged CONTEST_COST + HUMAN_REVIEW_COST for the same
+case. The agent escalated whenever gross recovery cleared Rs 1,000; the scorer
+only profited above Rs 1,312.50. Every case in that band was escalated by the
+policy and booked as a loss by the metric.
+
+Correcting it moved the headline from Rs 529,555 to Rs 526,279 -- 0.6% lower on
+this sample, because twelve of the repriced cases happened to be rescued and
+won. Everything structural improved: escalations fell from 50 to 38, the agent's
+figure rose at every contest cost above the default, and the sensitivity gap
+widened. The escalation cost now has a single definition in
+eval/metrics.py::escalation_cost which both the decision and scoring paths
+import.
