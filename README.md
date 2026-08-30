@@ -20,16 +20,19 @@ saw, against two mandatory baselines. A metric without a baseline is decoration.
 |---|---:|---|---|---|
 | contest everything | ₹293,402 | 484 / 0 / 316 | 0.39 / 1.00 | 0.67 / 1.00 |
 | contest nothing | ₹0 | 0 / 800 / 0 | 0.00 / 0.00 | 0.00 / 0.00 |
-| **agent** | **₹529,555** | 392 / 358 / 50 | 0.54 / 0.76 | **0.93** / 0.77 |
+| **agent** | **₹526,279** | 392 / 370 / 38 | 0.54 / 0.74 | **0.93** / 0.75 |
 
-The agent recovers **₹236,153 more than contesting everything** — 1.8× the
+The agent recovers **₹232,877 more than contesting everything** — 1.79× the
 return on the same 800 disputes — while submitting fewer packets (392 vs 484)
-and sending one sixth as many to a human (50 vs 316).
+and sending **one eighth** as many to a human (38 vs 316).
 
 **Where completeness and hallucination are measured.** The policy scorer in
 `eval/baselines.py` assembles packets deterministically rather than calling
 Stages 3 and 4, so those two metrics belong to the verifier section below, where
-they are measured on the real drafting path.
+they are measured on the real drafting path. Both are also structurally pinned
+here: a packet is submitted only when it is not blocked, which means it is
+already complete, and unsupported claims are stripped before submission. Neither
+figure could be anything but 1.0 and 0.0 in this table.
 
 **Two precision numbers, deliberately.** *Winnable* precision asks whether we
 would have won. *EV* precision asks whether contesting was worth attempting at
@@ -45,8 +48,8 @@ trying to win every dispute. It is trying to spend well.
 |---|---:|---|---|---:|
 | A — documentary wins | 135 | 0.85 / 0.96 | 1.00 / 0.99 | 234,598 |
 | B — winnable with the right packet | 109 | 0.63 / 0.93 | 0.99 / 0.99 | 161,428 |
-| C — the ambiguous middle | 287 | 0.38 / 0.52 | 0.97 / 0.59 | 93,819 |
-| D — very difficult | 151 | 0.15 / 0.50 | 0.63 / 0.72 | 42,859 |
+| C — the ambiguous middle | 287 | 0.39 / 0.48 | 0.97 / 0.54 | 94,424 |
+| D — very difficult | 151 | 0.13 / 0.45 | 0.63 / 0.70 | 38,979 |
 | E — structurally unwinnable | 118 | 0.00 / 0.00 | 1.00 / 0.27 | −3,150 |
 
 Tier E is the point of the project. The agent wins **nothing** there — winnable
@@ -56,9 +59,10 @@ expected-value reading would contest. Industry data puts the representment win
 rate for true fraud chargebacks at 9.27%; for a class of disputes that wins
 roughly one time in eleven, at a cost per attempt, the correct action is to
 accept immediately and stop spending. The agent reaches that from observable
-features alone — it never sees the tier.The EV precision of 1.00 in that row is not a
-contradiction: every Tier E case the agent did contest was positive-expected-value
-at the time of the decision. Correct by the rule, and still a loss.
+features alone — it never sees the tier. The EV precision of 1.00 in that row is
+not a contradiction: every Tier E case the agent did contest was
+positive-expected-value at the time of the decision. Correct by the rule, and
+still a loss.
 
 The residual −₹3,150 is honest and worth stating: with a heavy-tailed amount
 distribution, a 5% chance on a ₹80,000 dispute clears a ₹250 threshold on
@@ -114,45 +118,62 @@ a time (`data/cost_sweep_results.txt`):
 
 | constant | range | agent | contest-all |
 |---|---|---|---|
-| contest cost | ₹100 → ₹900 (9×) | 608,736 → 309,846 | 413,402 → **−226,598** |
-| human review cost | ₹300 → ₹2,500 (8×) | 538,889 → 506,978 (−5.9%) | 451,402 → **−243,798** |
-| net recovery | 0.5 → 1.0 | 269,135 → 649,924 | **−13,858** → 425,085 |
-| human resolve rate | 0.2 → 0.8 | 508,338 → 529,555 (+4.2%) | 203,586 → 293,402 (+44%) |
+| contest cost | ₹100 → ₹900 (9×) | 605,729 → 335,964 | 413,402 → **−226,598** |
+| human review cost | ₹300 → ₹2,500 (8×) | 549,581 → 511,300 (−7.0%) | 451,402 → **−243,798** |
+| net recovery | 0.5 → 1.0 | 265,658 → 650,516 | **−13,858** → 425,085 |
+| human resolve rate | 0.2 → 0.8 | 508,338 → 526,279 (+3.5%) | 203,586 → 293,402 (+44%) |
 
 The agent wins at every value tested. More usefully, it is far *less sensitive*:
-across an 8× change in review cost it moves 5.9%, while contest-all turns
+across an 8× change in review cost it moves 7.0%, while contest-all turns
 negative. Contest-all goes negative in three of the four sweeps; the agent never
-does, and its worst value anywhere is ₹269,135.
+does, and its worst value anywhere is ₹265,658.
 
-The mechanism is simple. The agent escalates 50 packets; contest-all escalates
+The mechanism is simple. The agent escalates 38 packets; contest-all escalates
 316. Where the true cost of human review is unknown — and it is — that
 difference in exposure is itself the argument.
+
+A fifth constant, the ₹1,500 median order value, is **not** swept: varying it
+requires regenerating the datasets and retraining rather than rescoring. It is
+disclosed as a stated assumption in §3.
 
 ### A negative result: confidence thresholds do not help
 
 An obvious alternative to expected value is a confidence floor: never contest
 below some p(win), whatever the amount. Swept from 0.00 to 0.30 on the holdout,
-the floor appeared to gain ₹10,250 at 0.20.
+it peaks at zero and loses **₹28,154 at the very first step above it**.
 
-**It did not replicate.** The same sweep on a second dataset was flat, with the
-maximum at a different value. The apparent gain was 2.2% of the total, found by
-sweeping seven values and taking the best — the classic shape of a result found
-by looking. It is reported here as noise, not as a finding.
+```
+floor   net rupees
+0.00     526,279   <- peak
+0.05     498,125
+0.10     493,547
+0.15     478,932
+0.20     479,143
+0.25     483,193
+0.30     479,385
+```
 
-On the earlier, less realistic amount distribution the same floor *cost*
-₹65,616. That the sign of the effect depends on the transaction distribution is
-itself worth knowing, and is part of why the substrate was refitted (§3).
+Tier D collapses from ₹38,979 to ₹10,825 at a floor of 0.05 and turns negative
+by 0.15. The floor kills exactly the high-amount low-probability cases that
+expected value says are worth attempting — a ₹2,00,000 dispute at 20% odds is
+worth an analyst's hour, and a floor at 0.25 throws it away. It cannot
+distinguish "low probability because unwinnable" from "low probability but a
+large amount", and the second is where triage earns its keep.
 
-Expected value with correct cost accounting needs no confidence threshold on
-top. A floor cannot distinguish "low probability because unwinnable" from "low
-probability but ₹2,00,000 at stake," and the second is exactly where triage
-earns its keep.
+**This result took three runs to get right, which is itself worth reporting.**
+On an earlier, invented amount distribution the floor cost ₹65,616. On resampled
+real amounts, with the escalation branch still mispriced, it appeared to *gain*
+₹10,250 at a floor of 0.20 — a gain that did not replicate on a second dataset,
+and that vanished entirely once the escalation cost was corrected (§3). The
+floor was compensating for an accounting error, not adding anything.
 
 ---
 
 ## 2. The pipeline
-![Pipeline architecture](docs/architecture.svg)
+
 Input is a dispute. Output is a decision, a verified packet, and a log line.
+
+![Pipeline architecture](docs/architecture.svg)
 
 **Stage 1 — Triage.** A calibrated gradient-boosted classifier scores p(win)
 from reason code, amount, evidence completeness, address match, prior disputes,
@@ -161,10 +182,11 @@ into a decision.
 
 The EV rule prices against the branch the case will *actually* take. The packet
 is built *before* the decision, because a case whose packet will be blocked does
-not cost ₹250 — it costs ₹800 and only pays out on the fraction a human can
-resolve. Pricing every contest identically overspends on exactly the cases least
-able to repay it. Fixing this was worth ₹72,850 on its own, with no change to
-the model.
+not cost ₹250 — the packet was already assembled, so it costs ₹250 plus ₹800 of
+analyst time, and it pays out only on the fraction a human can resolve. Pricing
+every contest identically overspends on exactly the cases least able to repay
+it. Building the packet first was worth ₹72,850; pricing the blocked branch
+correctly cut the human queue by a further 24%.
 
 **Stage 2 — Retrieval. No model.** Look up the reason code in the rulebook, pull
 exactly those artifacts. A dictionary lookup and a filter. Routing this through
@@ -189,13 +211,18 @@ submission of a packet that failed verification. A drafting failure returns zero
 claims, which the verifier treats as incomplete — a failed API call can never
 become a submission.
 
+A merchant-facing dashboard over the same pipeline lives in `webapp/` (Vite +
+React + TypeScript) with a FastAPI backend in `serve/`. Every scored field it
+displays comes from the modules above; the API routes and serialises, it does
+not decide anything.
+
 ### Model quality
 
 Trained on 3,000 disputes, evaluated on an internal split (not the holdout):
 
 ```
 AUC    0.800
-Brier  0.1760   (base-rate Brier 0.2424 -> skill score 0.235)
+Brier  0.1760   (base-rate Brier 0.2458 -> skill score 0.284)
 ECE    0.0285
 ```
 
@@ -254,7 +281,9 @@ figures: Indian e-commerce AOV of US$59 (ECDB, 2024, ~₹5,000) and quick-commer
 AOV of ₹500 (Economic Times). Both are means; the empirical mean/median ratio in
 IEEE-CIS is 1.94, implying medians of ~₹2,580 and ~₹258. ₹1,500 sits between
 them and reflects Razorpay's base being dominated by small e-commerce merchants
-rather than the big-ticket categories that pull the national AOV upward.
+rather than the big-ticket categories that pull the national AOV upward. It is
+not swept, because varying it requires regenerating the datasets rather than
+rescoring.
 
 **The honest description of the dataset is: real transaction substrate,
 generated dispute layer.**
@@ -295,15 +324,32 @@ Five rules keep it honest:
 review ₹800, net recovery 0.85, human resolve rate 0.80. No public figure exists
 for any of them in an Indian context. This is why they are swept (§1).
 
+**Net recovery is modelled proportionally; real chargeback fees are flat.** The
+0.85 treats the fee as a share of the amount, so it implies a ₹90 fee on a ₹600
+dispute and a ₹3,300 fee on a ₹22,000 one. A flat ₹400 fee would leave the small
+dispute with nothing worth recovering. The distortion is concentrated below about
+₹5,000, which is the densest part of the distribution, and it biases toward
+contesting small disputes. Stated rather than corrected, because changing it
+means another full regeneration.
+
 **The human-queue model is deliberately conservative.** An escalated case is
 assumed to reach a person who can repair the packet but cannot change the facts
 — the human gets no skill bonus, only the ability to unblock.
+
+**Packet quality does not affect the win rate.** The outcome label is drawn from
+the case pattern and does not depend on the packet the agent assembles, because
+the counterfactual is unknowable. So Stages 3 and 4 contribute to the money only
+through the block decision, never through better outcomes. A reader would
+reasonably assume otherwise.
 
 **The benchmarks quoted are US or global, not Indian.** The 41% overall
 representment win rate, 9.27% for true fraud, and 12–18% net recovery are
 vendor-published and survey-based, predominantly US. No reliable India-specific
 chargeback benchmark is publicly available. Applying them to Indian merchants is
-an assumption, and it is labelled as one wherever it appears.
+an assumption, and it is labelled as one wherever it appears. Note also that the
+12–18% figure is *portfolio* net recovery, which already contains the win rate —
+it is not comparable to the 0.85 constant above, which is the share recovered
+given a win.
 
 **Four rulebook entries are provisional.** Razorpay's evidence page groups codes
 under four category tabs; only the Customer Dispute tab was retrievable. Visa
@@ -329,10 +375,11 @@ exactly what the fault-injection curve is for.
 parameters differ between the two sets by design; amounts do not, because both
 are samples from the same real distribution.
 
-### Three errors found and corrected during the build
+### Four errors found and corrected during the build
 
 All are in the git history rather than quietly fixed, because how a system fails
-is part of what it is.
+is part of what it is. Three of the four produced a *plausible number* rather
+than a crash, which is the expensive kind.
 
 **The rulebook was wrong.** v1 was transcribed from memory: RZP01 was modelled
 as a duplicate-charge code when it is goods-not-provided, Visa 13.1 required an
@@ -351,12 +398,26 @@ was identical output across an 8× range. The sweep now patches both modules and
 refuses to report robustness for any constant whose values produce identical
 results.
 
-**The EV rule mispriced blocked packets.** It charged every contest at
-`CONTEST_COST`, then discovered afterwards whether the packet would be blocked.
-Since packet assembly is deterministic and independent of the decision, it can be
-done first — and a blocked packet costs `HUMAN_REVIEW_COST` while paying out only
-on the fraction a human can rescue. Correcting the pricing was worth ₹72,850 and
-cut escalations by 72%, with no change to the model.
+**The EV rule mispriced blocked packets, twice.** First it charged every contest
+at `CONTEST_COST` and only discovered afterwards whether the packet would be
+blocked; since assembly is deterministic and independent of the decision, it can
+be done first. Correcting that was worth ₹72,850 and cut escalations by 72%.
+
+Then a subtler version of the same split: `metrics.net_rupee_impact` charged
+`CONTEST_COST + HUMAN_REVIEW_COST` for an escalation while the decision rule
+charged `HUMAN_REVIEW_COST` alone. The agent escalated whenever gross recovery
+cleared ₹1,000; the scorer only profited above ₹1,312.50. Every case in that band
+was escalated by the policy and booked as a loss by the metric — the same
+decision-versus-scoring drift as the cost sweep bug, one layer down. Correcting
+it moved the headline from ₹529,555 to ₹526,279, cut the human queue from 50 to
+38, and removed a spurious ₹10,250 result from the floor sweep. The escalation
+cost now has a single definition in `metrics.escalation_cost` which both paths
+import.
+
+**The amount distribution was too smooth.** Fitting a log-normal gave a
+p99/median of 8.71 when the real data has 15.28. Real transactions have a
+heavier tail and cluster at price points, so amounts are now resampled directly
+rather than approximated.
 
 ### What would change with production data
 
@@ -403,6 +464,13 @@ rate — no API key, no network. For the real model, set `GEMINI_API_KEY` and
 `CB_LLM_MODEL=gemini-3.1-flash-lite` in `.env`, then `CB_LLM=gemini`. The
 reported run used 50 disputes at 4.5s intervals to stay inside the free tier's
 15 requests/minute.
+
+The dashboard needs two terminals:
+
+```bash
+cd serve  && uvicorn app:app --reload --port 8000
+cd webapp && npm install && npm run dev
+```
 
 The IEEE-CIS CSV is not in this repository (683MB, and not ours to
 redistribute). `rulebook/ieee_profile.json` and `data/ieee_amount_sample.json`
