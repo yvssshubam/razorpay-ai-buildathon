@@ -1,6 +1,6 @@
 # Chargeback Triage and Evidence Agent
 
-**Razorpay AI Buildathon — Track 02: AI Risk Manager**
+**Razorpay AI Buildathon, Track 02: AI Risk Manager**
 
 Most merchants either fight every chargeback or fight none. Both are wrong. This
 agent decides which disputes are worth contesting, assembles a network-compliant
@@ -22,8 +22,8 @@ saw, against two mandatory baselines. A metric without a baseline is decoration.
 | contest nothing | ₹0 | 0 / 800 / 0 | 0.00 / 0.00 | 0.00 / 0.00 |
 | **agent** | **₹526,279** | 392 / 370 / 38 | 0.54 / 0.74 | **0.93** / 0.75 |
 
-The agent recovers **₹232,877 more than contesting everything** — 1.79× the
-return on the same 800 disputes — while submitting fewer packets (392 vs 484)
+The agent recovers **₹232,877 more than contesting everything**, 1.79 times the
+return on the same 800 disputes, while submitting fewer packets (392 vs 484)
 and sending **one eighth** as many to a human (38 vs 316).
 
 **That gap is a sum over a heavy-tailed amount distribution, so it needs an
@@ -58,11 +58,11 @@ would have won. *EV* precision asks whether contesting was worth attempting at
 The gap is not hypothetical, so here is a case from the holdout rather than an
 invented one. `D00187`, Mastercard 4837, ₹35,535, true win probability 0.18: it
 returns ₹5,431 in expected recovery against a ₹250 cost. Contesting it is
-correct, and it lost — as it should roughly four times in five. It counts
+correct, and it lost, as it should roughly four times in five. It counts
 against winnable precision and for EV precision, and both are right.
 
 That case is typical, not cherry-picked. The agent contested 430 disputes and
-lost 196 of them; **170 of those 196 losses — 87% — were positive-expected-value
+lost 196 of them. **170 of those 196 losses, or 87%, were positive-expected-value
 at the time of the decision.** The agent scores 0.54 winnable precision and 0.93
 EV precision, and the distance between those two numbers is almost entirely
 this. It is not trying to win every dispute. It is trying to spend well.
@@ -82,7 +82,7 @@ footnote, because the split between the two columns *is* the triage argument.
 Contesting everything is wrong in exactly one direction and never leaves money
 behind, which is why it looks safe and costs ₹326,050. The agent is wrong in
 both directions and costs **46% of that**. It accepts some cases it would have
-won — ₹77,417 of them, and that column is the honest price of triage — and buys
+won. That is ₹77,417, and the column is the honest price of triage. It buys
 that with a 78% reduction in wasted contests. `left_behind` is net of the
 contest cost the attempt would have required.
 
@@ -90,20 +90,20 @@ contest cost the attempt would have required.
 
 | tier | n | P/R (winnable) | P/R (EV) | net ₹ |
 |---|---:|---|---|---:|
-| A — documentary wins | 135 | 0.85 / 0.96 | 1.00 / 0.99 | 234,598 |
-| B — winnable with the right packet | 109 | 0.63 / 0.93 | 0.99 / 0.99 | 161,428 |
-| C — the ambiguous middle | 287 | 0.39 / 0.48 | 0.97 / 0.54 | 94,424 |
-| D — very difficult | 151 | 0.13 / 0.45 | 0.63 / 0.70 | 38,979 |
-| E — structurally unwinnable | 118 | 0.00 / 0.00 | 1.00 / 0.27 | −3,150 |
+| A, documentary wins | 135 | 0.85 / 0.96 | 1.00 / 0.99 | 234,598 |
+| B, winnable with the right packet | 109 | 0.63 / 0.93 | 0.99 / 0.99 | 161,428 |
+| C, the ambiguous middle | 287 | 0.39 / 0.48 | 0.97 / 0.54 | 94,424 |
+| D, very difficult | 151 | 0.13 / 0.45 | 0.63 / 0.70 | 38,979 |
+| E, structurally unwinnable | 118 | 0.00 / 0.00 | 1.00 / 0.27 | −3,150 |
 
-Tier E is the point of the project. The agent wins **nothing** there — winnable
-precision and recall are both zero — and it has learned to mostly stop trying:
+Tier E is the point of the project. The agent wins **nothing** there. Winnable
+precision and recall are both zero, and it has learned to mostly stop trying:
 EV recall of 0.27 means it declines nearly three quarters of the cases a naive
 expected-value reading would contest. Industry data puts the representment win
 rate for true fraud chargebacks at 9.27%; for a class of disputes that wins
 roughly one time in eleven, at a cost per attempt, the correct action is to
 accept immediately and stop spending. The agent reaches that from observable
-features alone — it never sees the tier. The EV precision of 1.00 in that row is
+features alone. It never sees the tier. The EV precision of 1.00 in that row is
 not a contradiction: every Tier E case the agent did contest was
 positive-expected-value at the time of the decision. Correct by the rule, and
 still a loss.
@@ -126,12 +126,12 @@ surviving claims still cover the reason code's documented requirement. The first
 four strip claims; the fifth blocks the packet.
 
 **The fifth check exists because the first four were not enough, and the way
-that was found is worth reporting.** Checks 1–3 are all structural: they ask
+that was found is worth reporting.** Checks 1-3 are all structural: they ask
 whether the citation points at a real, correctly typed, sufficiently old
 document. They say nothing about whether the claim's *content* matches that
-document's content. So the exact example quoted above — "delivered on 3 March",
+document's content. So the exact example quoted above, "delivered on 3 March",
 citing a real, correctly typed, correctly dated `delivery_confirmation` that
-actually records 11 March — passed every check. The failure mode the whole
+actually records 11 March, passed every check. The failure mode the whole
 architecture is justified by was the one the gate did not enforce.
 
 The injector had the same blind spot. It generated bad artifact IDs and kind
@@ -139,7 +139,7 @@ mismatches, so *detection tracking injection* only demonstrated that the
 verifier catches faults built to be catchable. That is E1's lesson a second
 time: a measurement that cannot fail is not a measurement.
 
-Both were fixed together — claims are now `{artifact_id, asserts_kind,
+Both were fixed together. Claims are now `{artifact_id, asserts_kind,
 asserts_field, asserts_value}` triples checked against the record, and a fifth
 fault class corrupts a field value inside an otherwise perfect artifact.
 Re-running the curve with the harder injector, against both verifiers:
@@ -159,7 +159,7 @@ reason given below. The earlier version of this table was measured on the first
 50 disputes, `verify.py`'s default, and did not say so; it reproduces exactly at
 `python agent/verify.py data/holdout.jsonl 50`.*
 
-The old verifier now visibly undershoots — it detects about two thirds of what
+The old verifier now visibly undershoots. It detects about two thirds of what
 is injected, and the missing third is precisely the field-level class. The
 five-check verifier tracks injection across the same eightfold range. **No
 fabrication reached a submitted packet at any fault rate under either
@@ -172,7 +172,7 @@ trusted, on the same logic: a gate cannot pass what it cannot check. That is
 counted separately from fabrication, because an unverifiable claim is a
 drafting-format failure and not a lie.
 
-**The zero-fault intercept did not move** — 0.395 before and after — which
+**The zero-fault intercept did not move**, 0.395 before and after, which
 matters, because the intercept is the finding below and a new check that
 inflated it would have been buying the result.
 
@@ -195,11 +195,11 @@ evidence rather than an artifact of how the mock builds claims.
 The drafting schema now demands that each claim name an artifact field and copy
 its value, and the model did so on every claim without exception. **`value` is
 also 0.000**: every copied value matched the record. So the zero-fabrication
-result is no longer only about references — the model invented neither an
+result is no longer only about references. The model invented neither an
 artifact nor a *value inside* one, which is the failure mode §4 exists to catch.
 
-Two honest limits on that. The artifact payloads are short scalars — a tracking
-ID, a day number — so copying them is an easy instruction to follow; the claim
+Two honest limits on that. The artifact payloads are short scalars, a tracking
+ID or a day number, so copying them is an easy instruction to follow. The claim
 is that the model does not fabricate values it has been asked to copy, not that
 it never fabricates. And 50 disputes at one temperature is a small sample. The
 injected-fault curve, not this run, is what demonstrates the gate works when a
@@ -210,7 +210,7 @@ did not test it. Both claims are needed and neither substitutes for the other.
 
 **The intercept is the more interesting number, and it depends on which
 disputes you ask about.** At *zero* model error, **39.5% of all 800 disputes
-block** — on evidence timestamped after the dispute, and on required documents
+block**, on evidence timestamped after the dispute and on required documents
 that never existed at all. Under the agent's triage the same floor is **8.8%**
 (38 of the 430 it contests). Both are correct and they are not the same
 measurement, so the harness reporting each says which:
@@ -244,6 +244,85 @@ packet blocked on both an unreachable kind *and* a kind the drafter lost is
 attributed to the model, so structural blocks get reclassified rather than
 disappearing. The floor is only readable at fault rate zero.
 
+### The model barely beats a hand-written rule
+
+This is the least flattering number in the project, so it goes above the
+robustness section rather than in a footnote. Swap the calibrated classifier for
+the hand-written heuristic it replaced, one documented command:
+
+```
+CB_P_WIN=heuristic python eval/run_eval.py --data data/holdout.jsonl
+```
+
+|  | net rupees | AUC | Brier | ECE | sub/acc/esc |
+|---|---:|---:|---:|---:|---|
+| heuristic | **531,493** | 0.770 | 0.1939 | 0.0848 | 423/348/29 |
+| calibrated model | 526,279 | 0.803 | 0.1744 | 0.0337 | 392/370/38 |
+
+**The heuristic nets ₹5,214 more.** Bootstrapped over 2,000 resamples that gap
+has a 95% CI of **[−₹13,233, +₹21,871]**, with 547 of 2,000 draws at or below
+zero. The two are not distinguishable on net rupees, and anyone claiming the
+model wins on this metric is reading noise.
+
+What the model does win is calibration: **ECE 0.034 against 0.085, Brier 0.174
+against 0.194**. That matters here specifically, because the EV rule multiplies
+p(win) by rupees. A policy that is right on average while being wrong about
+*which* cases is fragile to the constant changes swept below. And the
+heuristic's confidence floor was hand-tuned against this dataset, which the
+model's was not.
+
+The honest conclusion is that **the classifier is not where the value is.** The
+value is in the EV framing, the verifier gate, and the triage reframe; the
+classifier is a replaceable component that happens to be better calibrated than
+the rule it replaced. A submission claiming a model beat a heuristic by ₹5,214
+on n=800 would be claiming something this project's own bootstrap contradicts.
+
+### The merchant loop, and where verification ends
+
+The structural intercept says 40% of packets block on evidence that was
+timestamped after the dispute or never existed, and that no drafting
+improvement removes it. The merchant is the only party who can. So the
+dashboard asks. Optionally, once, without nagging.
+
+Measured across the 800:
+
+- **316 disputes (40%) show a prompt**, and all 316 unblock if answered.
+- **240 flip** from "do not contest" to "contest".
+- **172 need exactly one document**, and the verdict turns on that single
+  document in 122 of them.
+- **₹476,247 of expected value moves**, if every prompt were answered, which
+  no real merchant population will do. The figure is an upper bound and is
+  never quoted without that attached.
+
+**What that ₹476,247 is not.** It is not money recovered without a human. Every
+one of those unblocks depends on a record the merchant asserted, and the system
+itself marks those as unverifiable. The accurate claim is narrower and better:
+the loop converts **unverifiable absence into audited assertion**, moving that
+EV from "a person must find this document" to "the system recommends, with the
+dependency permanently flagged."
+
+**Where verification ends.** The five checks compare a *claim* against a
+*record*. For a merchant-supplied record the merchant is the source of both
+sides, so a faithful claim about an invented value passes every check honestly.
+Filing `INVENTED-99999` against D00003's missing document produces 5 claims
+drafted, 0 stripped, packet submittable, p(win) 0.137 → 0.639. **This is
+architectural, not a bug, and no check closes it.** There is no ground truth to
+compare a merchant-only artifact against.
+
+An earlier version of this README and of the code's own integrity notes claimed
+check 4 caught this. That claim was false and is recorded as error 9 below. The
+gate closes *model* fabrication. It cannot close *merchant* fabrication.
+
+What the system does instead is refuse to hide it. Provenance is marked
+permanently on the artifact; `serve/packet.py` computes
+`depends_on_merchant_evidence` by testing whether the system-retrieved kinds
+alone still cover the rulebook; and that flag appears in the API response, the
+audit line, and as a warning on the packet panel. Requiring a typed value
+rather than a tick is friction and an evidence trail, not a security control.
+
+Stating the boundary is the risk-management position. A system that cannot say
+where its own verification stops is not one an acquirer should sit behind.
+
 ### Robustness: the constants were chosen, not measured
 
 Four numbers underpin every rupee figure: contest cost, human review cost, net
@@ -264,8 +343,8 @@ negative. Contest-all goes negative in three of the four sweeps; the agent never
 does, and its worst value anywhere is ₹265,658.
 
 The mechanism is simple. The agent escalates 38 packets; contest-all escalates
-316. Where the true cost of human review is unknown — and it is — that
-difference in exposure is itself the argument.
+316. Where the true cost of human review is unknown, and it is, that
+difference in exposure is the argument.
 
 **Two objections to answer before they are raised.**
 
@@ -276,13 +355,13 @@ contest-all is ₹304,752 at a resolve rate of 0.2 and ₹232,877 at 0.8. The
 **margin is narrowest at the default**, because a generous resolve rate helps
 the policy escalating 316 packets far more than the one escalating 38. Every
 untested value below the default widens the gap. Contest cost runs the other
-way — the margin grows from ₹192,327 at ₹100 to ₹562,562 at ₹900, so ₹250 sits
+way. The margin grows from ₹192,327 at ₹100 to ₹562,562 at ₹900, so ₹250 sits
 in the lower third, and only an implausibly cheap ₹100 contest produces a
 narrower margin than the shipped figure.
 
 *The second is the one actually worth worrying about, so here it is stated
 plainly.* The result is most exposed to **human review being cheap**. At ₹300 a
-review the margin falls to **₹98,179** — the narrowest figure anywhere in the
+review the margin falls to **₹98,179**, the narrowest figure anywhere in the
 sweep, 58% below the headline. The mechanism is direct: the agent's advantage is
 substantially an escalation-exposure advantage, 38 packets against 316, and if a
 human costs almost nothing then contest-all's queue costs almost nothing either.
@@ -313,22 +392,22 @@ floor   net rupees
 ```
 
 Tier D collapses from ₹38,979 to ₹10,825 at a floor of 0.05 and turns negative
-by 0.15. The floor kills exactly the high-amount low-probability cases that
-expected value says are worth attempting — a ₹2,00,000 dispute at 20% odds is
+by 0.15. The floor kills the high-amount low-probability cases that
+expected value says are worth attempting. A ₹2,00,000 dispute at 20% odds is
 worth an analyst's hour, and a floor at 0.25 throws it away. It cannot
 distinguish "low probability because unwinnable" from "low probability but a
 large amount", and the second is where triage earns its keep.
 
-**This result took three runs to get right, which is itself worth reporting.**
+**This result took three runs to get right, and that is worth reporting too.**
 On an earlier, invented amount distribution the floor cost ₹65,616. On resampled
 real amounts, with the escalation branch still mispriced, it appeared to *gain*
-₹10,250 at a floor of 0.20 — a gain that did not replicate on a second dataset,
+₹10,250 at a floor of 0.20, a gain that did not replicate on a second dataset,
 and that vanished entirely once the escalation cost was corrected (§3). The
 floor was compensating for an accounting error, not adding anything.
 
 **The floor peaks at 0.00, which is the bottom of its own swept range, and a
 maximum sitting on a boundary is not a demonstrated maximum.** So the
-accept/contest boundary itself is swept in both directions — contest if
+accept/contest boundary itself is swept in both directions, contesting if
 `ev > T`, with T from −₹300 to +₹300. Negative T contests marginally EV-negative
 cases; positive T demands a margin.
 
@@ -363,46 +442,68 @@ Input is a dispute. Output is a decision, a verified packet, and a log line.
 
 ![Pipeline architecture](docs/architecture.svg)
 
-**Stage 1 — Triage.** A calibrated gradient-boosted classifier scores p(win)
+**Stage 1, triage.** A calibrated gradient-boosted classifier scores p(win)
 from reason code, amount, evidence completeness, address match, prior disputes,
 device signals and artifact timestamps. An expected-value rule converts that
 into a decision.
 
 The EV rule prices against the branch the case will *actually* take. The packet
 is built *before* the decision, because a case whose packet will be blocked does
-not cost ₹250 — the packet was already assembled, so it costs ₹250 plus ₹800 of
+not cost ₹250. The packet was already assembled, so it costs ₹250 plus ₹800 of
 analyst time, and it pays out only on the fraction a human can resolve. Pricing
-every contest identically overspends on exactly the cases least able to repay
+every contest identically overspends on the cases least able to repay
 it. Building the packet first was worth ₹72,850; pricing the blocked branch
 correctly cut the human queue by a further 24%.
 
-**Stage 2 — Retrieval. No model.** Look up the reason code in the rulebook, pull
+**Stage 2, retrieval. No model.** Look up the reason code in the rulebook, pull
 exactly those artifacts. A dictionary lookup and a filter. Routing this through
 an LLM would add latency, cost, and a failure mode, in exchange for nothing.
 
-**Stage 3 — Drafting.** A language model produces a structured claims list, not
+**Stage 3, drafting.** A language model produces a structured claims list, not
 prose: each claim carries the ID of the artifact supporting it and the evidence
 kind it asserts. The model sees *only* what Stage 2 retrieved, so it cannot cite
-something that was never pulled — one whole class of fabrication removed by
+something that was never pulled. That removes one whole class of fabrication by
 construction rather than by instruction.
 
-**Stage 4 — The verifier.** Four deterministic checks per claim: the artifact
+**Stage 4, the verifier.** Four deterministic checks per claim: the artifact
 exists, its kind matches what the claim asserts, it predates the dispute, and
 after stripping, the survivors still satisfy the reason code's requirement.
 Nothing here uses a model to check a model; that just moves the trust problem.
 Failing the first three strips a claim. Failing the fourth blocks the packet and
 routes it to a human.
 
-**Stage 5 — Audit and stopping rules.** Every dispute produces a durable record:
+**Stage 5, audit and stopping rules.** Every dispute produces a durable record:
 decision, p(win), the EV calculation, artifacts used, verifier result. No
 submission of a packet that failed verification. A drafting failure returns zero
-claims, which the verifier treats as incomplete — a failed API call can never
+claims, which the verifier treats as incomplete. A failed API call can never
 become a submission.
 
 A merchant-facing dashboard over the same pipeline lives in `webapp/` (Vite +
 React + TypeScript) with a FastAPI backend in `serve/`. Every scored field it
 displays comes from the modules above; the API routes and serialises, it does
 not decide anything.
+
+### Why this is a pipeline and not an agent
+
+Stages 2 and 4 use no model, the five stages run in the same order every time,
+and nothing replans or selects tools. By most 2026 definitions this is not an
+agent, and it is worth saying so before a reviewer does.
+
+The obvious agentic addition, letting the verifier feed back to the drafter to
+search for alternative artifacts that satisfy a missing requirement, redraft and
+retry, was considered and measured. **Across all 316 blocked packets, zero contain an
+unretrieved artifact that could close the gap.** `retrieve()` already returns
+everything in the record; on D00003 that is 4 artifacts of 4, and the fifth
+required document does not exist. A retrieval loop would search, find nothing,
+and escalate exactly where the pipeline escalates now.
+
+The bottleneck is not search strategy. It is that the document was never
+written. That is the same finding as the structural intercept, arriving from a
+different direction, and it is the argument against adding agency here rather
+than an admission of missing it.
+
+The defensible position: deterministic where trust is required, a model where
+judgment is required, actions with priced consequences, and a full audit trail.
 
 ### Model quality
 
@@ -431,7 +532,7 @@ The holdout is generated with a different seed and shifted tier weights, so its
 prior is 4.1 points lower than training. The model carries the training prior
 across: mean predicted p(win) is `0.4227` against an observed `0.3937`, so it is
 mildly **over**-confident on the holdout, and every reliability bin above 0.1
-predicts at or above the observed rate. Direction matters — over-confidence
+predicts at or above the observed rate. Direction matters, because over-confidence
 under an EV rule means contesting slightly too much, not too little.
 `data/reliability.png` (internal), `data/reliability_holdout.png` (holdout).
 
@@ -444,7 +545,7 @@ p(win) by rupees. A model that says 0.9 when it is right 0.6 of the time
 overspends systematically, and AUC will not catch it.
 
 Two honest notes. On the internal split the model is mildly overconfident in the
-0.6–0.7 band (predicted 0.638, observed 0.548) on 31 samples, and mildly
+0.6-0.7 band (predicted 0.638, observed 0.548) on 31 samples, and mildly
 underconfident from 0.7 to 0.9. Neither is worth correcting; both are within
 what 3,000 rows supports. Ranking transfers to the holdout intact (AUC 0.803);
 the small calibration cost there is the prior shift, not overfitting.
@@ -463,7 +564,7 @@ that is generated, and what would change with production data.
 
 ### What is real
 
-**The rulebook.** `rulebook/reason_codes.yaml` — 42 reason codes across UPI,
+**The rulebook.** `rulebook/reason_codes.yaml` holds 42 reason codes across UPI,
 Visa, Mastercard, RuPay, American Express and Razorpay's own RZP codes, each
 mapped to its evidence requirements and to the field of Razorpay's contest API
 that evidence would be submitted under. Verified against Razorpay's published
@@ -475,14 +576,14 @@ and so on) rather than an invented taxonomy. A packet this agent assembles maps
 onto an actual `PATCH /v1/disputes/:id/contest` payload.
 
 **The transaction substrate.** Amounts are drawn from the empirical distribution
-of IEEE-CIS Fraud Detection (Kaggle/Vesta) — 590,540 real e-commerce
-transactions — and rescaled. Hour-of-day and day-of-week cycles are taken from
+of IEEE-CIS Fraud Detection (Kaggle/Vesta), 590,540 real e-commerce
+transactions, and rescaled. Hour-of-day and day-of-week cycles are taken from
 the same source. `data/amount_overlay.png`.
 
 This is a resampling, not a parametric fit. An earlier version fitted a
 log-normal to the real sigma of 0.954, and the overlay chart showed why that was
 not good enough: real p99/median is 15.28 and the fitted distribution gave 8.71.
-IEEE-CIS has a skew of 14.37 and a maximum 464× its median — no log-normal
+IEEE-CIS has a skew of 14.37 and a maximum 464 times its median. No log-normal
 reproduces that, and real amounts additionally cluster at price points. Drawing
 real values directly and rescaling gives p90/median 3.75 against the real 3.91,
 and p99/median 13.52 against 15.28. The residual gap is the sampling pool being
@@ -505,7 +606,8 @@ generated dispute layer.**
 ### What is generated
 
 Dispute outcome data does not exist publicly, least of all for Indian merchants.
-Razorpay legally cannot share it — RBI-regulated aggregator, PCI-DSS. Every
+Razorpay legally cannot share it, being an RBI-regulated aggregator under
+PCI-DSS. Every
 applicant hits the same wall, and Track 4 of this buildathon specifies synthetic
 data outright.
 
@@ -525,12 +627,12 @@ Five rules keep it honest:
    true win probability are written into each record with a leading underscore
    and are excluded by a guard in `agent/features.py` that fails the run if one
    is ever read as a feature.
-3. **The holdout is generated differently** — different seed, shifted tier
+3. **The holdout is generated differently.** Different seed, shifted tier
    weights, and one dispute pattern (C5, evidence timestamped after the dispute)
    that appears *only* in the holdout.
 4. **Unwinnable cases exist by design.** Tier E has no tell to find. The ceiling
    is not 100% and the project is not a one-line conditional.
-5. **Calibrated against a real substrate** — see above.
+5. **Calibrated against a real substrate.** See above.
 
 ### What is still not real
 
@@ -548,7 +650,7 @@ means another full regeneration.
 
 **The human-queue model is deliberately conservative.** An escalated case is
 assumed to reach a person who can repair the packet but cannot change the facts
-— the human gets no skill bonus, only the ability to unblock.
+so the human gets no skill bonus, only the ability to unblock.
 
 **Packet quality does not affect the win rate.** The outcome label is drawn from
 the case pattern and does not depend on the packet the agent assembles, because
@@ -557,11 +659,11 @@ through the block decision, never through better outcomes. A reader would
 reasonably assume otherwise.
 
 **The benchmarks quoted are US or global, not Indian.** The 41% overall
-representment win rate, 9.27% for true fraud, and 12–18% net recovery are
+representment win rate, 9.27% for true fraud, and 12-18% net recovery are
 vendor-published and survey-based, predominantly US. No reliable India-specific
 chargeback benchmark is publicly available. Applying them to Indian merchants is
 an assumption, and it is labelled as one wherever it appears. Note also that the
-12–18% figure is *portfolio* net recovery, which already contains the win rate —
+12-18% figure is *portfolio* net recovery, which already contains the win rate.
 it is not comparable to the 0.85 constant above, which is the share recovered
 given a win.
 
@@ -583,12 +685,12 @@ disputes (§1). By the rule of three that bounds the rate below roughly 1.3%, bu
 it is a single model on a single generated dataset at one temperature.
 
 Two halves of that zero deserve different amounts of credit. The
-**reference-level** zero — no invented artifact IDs, no upgraded kinds — is
+**reference-level** zero, meaning no invented artifact IDs and no upgraded kinds, is
 substantially explained by the constrained retrieval: the model cannot cite an
 artifact it was never shown, so the architecture is doing work the model is not.
 The **value-level** zero is not explained that way. Nothing in retrieval stops a
 model from misstating a figure inside an artifact it *was* shown, which is
-precisely why check 4 exists. That half is a result about the model rather than
+why check 4 exists. That half is a result about the model rather than
 about the harness, and it is the half worth quoting.
 
 A zero here still means the verifier was *untested* by this model, not that it
@@ -598,20 +700,21 @@ is unnecessary; that is exactly what the fault-injection curve is for.
 parameters differ between the two sets by design; amounts do not, because both
 are samples from the same real distribution.
 
-### Seven errors found and corrected during the build
+### Nine errors found and corrected during the build
 
 All are in the git history rather than quietly fixed, because how a system fails
 is part of what it is. Most produced a *plausible number* rather than a crash,
-which is the expensive kind. The last three were found by auditing the finished
-system rather than while building it, and two of those are errors in the
-*reporting* rather than the code — a wrong sentence and an overstated fix — which
-is a category worth naming, because no test suite covers it.
+which is the expensive kind. The last five were found by auditing the finished
+system rather than while building it, and three of those are errors in the
+*reporting* rather than the code: a wrong worked example, an overstated fix, and
+a false security claim. That is a category worth naming, because no test suite
+covers it.
 
 **The rulebook was wrong.** v1 was transcribed from memory: RZP01 was modelled
 as a duplicate-charge code when it is goods-not-provided, Visa 13.1 required an
 `avs_result` that does not appear in the docs, and UPI 1064 required a
 non-existent `ip_record`. Six patterns in the case taxonomy also filed the wrong
-code for the scenario described — fraud cases under customer-dispute codes.
+code for the scenario described, putting fraud cases under customer-dispute codes.
 Everything was regenerated against the corrected rulebook. A validator now fails
 the run if the taxonomy cites a code the rulebook does not define.
 Pre-correction results are kept in `data/v1_pre_rulebook_fix/`.
@@ -633,7 +736,7 @@ Then a subtler version of the same split: `metrics.net_rupee_impact` charged
 `CONTEST_COST + HUMAN_REVIEW_COST` for an escalation while the decision rule
 charged `HUMAN_REVIEW_COST` alone. The agent escalated whenever gross recovery
 cleared ₹1,000; the scorer only profited above ₹1,312.50. Every case in that band
-was escalated by the policy and booked as a loss by the metric — the same
+was escalated by the policy and booked as a loss by the metric, the same
 decision-versus-scoring drift as the cost sweep bug, one layer down. Correcting
 it moved the headline from ₹529,555 to ₹526,279, cut the human queue from 50 to
 38, and removed a spurious ₹10,250 result from the floor sweep.
@@ -641,8 +744,8 @@ it moved the headline from ₹529,555 to ₹526,279, cut the human queue from 50
 **And the fix for that was reported as more complete than it was.** The commit
 message and this README both said the escalation cost now had a single
 definition in `metrics.escalation_cost()` that every path imported. Two of the
-three did. `eval/baselines.py` — the decision rule itself, the path the bug had
-been in — was still adding `contest_cost + HUMAN_REVIEW_COST` by hand, four
+three did. `eval/baselines.py`, the decision rule itself and the path the bug had
+been in, was still adding `contest_cost + HUMAN_REVIEW_COST` by hand, four
 lines below a docstring in `metrics.py` explicitly forbidding exactly that. The
 two expressions were numerically identical, so nothing was wrong with any
 reported figure and nothing would have surfaced in a test. The tell was only
@@ -657,14 +760,14 @@ introducing the two precision definitions used "a ₹450 case we would win 80% o
 the time returns ₹306 against a ₹250 cost" as an example of a *correct decline*.
 It is not one: ₹306 − ₹250 = +₹56, so the rule contests it. The example also
 illustrated recall while sitting in a paragraph about precision. Nothing in the
-code was affected — no metric reads that sentence — which is precisely why it
+code was affected, since no metric reads that sentence, and that is why it
 survived several rounds of checking the code. It now uses a real holdout case
 (D00187) with the arithmetic taken from the file rather than composed by hand,
 and `metrics.py` records the boundary that any future example has to clear: at
 p = 0.8 a case must be under ₹368 to be a correct decline.
 
-**The verifier and its own test shared a blind spot.** Checks 1–3 were all
-structural — real ID, right kind, old enough — and none compared a claim's
+**The verifier and its own test shared a blind spot.** Checks 1-3 were all
+structural. Real ID, right kind, old enough. None of them compared a claim's
 content against the artifact's content. So a claim asserting a delivery date the
 document does not contain passed every check, while citing a genuine, correctly
 typed, correctly dated document. That is the exact scenario quoted at the top of
@@ -672,7 +775,7 @@ typed, correctly dated document. That is the exact scenario quoted at the top of
 place: it generated bad IDs and kind mismatches, so "detection tracks injection"
 demonstrated only that the verifier catches faults built to be catchable. E1's
 lesson, arriving a second time on a different subject: a measurement that cannot
-fail is not a measurement. Both were fixed together — claims became
+fail is not a measurement. Both were fixed together. Claims became
 `{artifact_id, asserts_kind, asserts_field, asserts_value}` triples with a fifth
 check, and the injector gained a fault class that corrupts a field value inside
 an otherwise perfect artifact. Against the harder injector the old verifier
@@ -685,11 +788,31 @@ p99/median of 8.71 when the real data has 15.28. Real transactions have a
 heavier tail and cluster at price points, so amounts are now resampled directly
 rather than approximated.
 
+**`evidence_view` disagreed with `_build_packet` on duplicate kinds.** It used
+`setdefault`, so the first artifact of a kind won, while the pipeline takes the
+set over all supported artifacts. One stale copy and one good copy therefore
+satisfied the rulebook and displayed as "stale". The generated data never emits
+a duplicate kind, so it was latent. But merchant-supplied evidence creates that
+shape by design, and it would have made the whole evidence loop silently
+no-op: a merchant would file the missing record and watch nothing change.
+
+**The integrity note claimed a security property the system does not have.**
+`serve/evidence.py` stated that a merchant inventing a value would be caught by
+check 4, and the merchant-facing panel told the user their input was "checked
+against the packet before anything is submitted." Both false, disproved by a
+single request. The reasoning error is worth naming precisely: it argued by
+analogy, reasoning that because the gate stops the model fabricating it must
+stop the merchant fabricating, without testing whether that held. It does not, because
+when the merchant supplies the record there is nothing to compare it against.
+Written inside a comment block headed `_INTEGRITY`, which is the worst place in
+a codebase to be confidently wrong, and shown to the one person best placed to
+exploit the gap. Rewritten as a trust boundary; see §1.
+
 ### What would change with production data
 
 The outcome labels would be real, so precision and recall would mean something
 about the world rather than about a generator. Packet completeness and
-hallucination rate would not change definition at all — they are verified against
+hallucination rate would not change definition at all, since they are verified against
 the input documents, not against a label, and do not care whether the disputes
 are synthetic. That is the structural advantage of this design: only one third of
 the scorecard depends on ground truth.
@@ -726,7 +849,7 @@ python cost_sweep.py
 ```
 
 Drafting defaults to a deterministic mock provider with a configurable fault
-rate — no API key, no network. For the real model, set `GEMINI_API_KEY` and
+rate, with no API key and no network. For the real model, set `GEMINI_API_KEY` and
 `CB_LLM_MODEL=gemini-3.1-flash-lite` in `.env`, then `CB_LLM=gemini`. The
 reported run used 50 disputes at 4.5s intervals to stay inside the free tier's
 15 requests/minute.
@@ -751,7 +874,7 @@ verifies proof and submits evidence. The framing is "we fight your disputes for
 you," and the scarce capability in that framing is drafting.
 
 This project does not claim novelty. It claims a reframe and a measurement. The
-data says the scarce capability is not writing the rebuttal — it is knowing which
+data says the scarce capability is not writing the rebuttal. It is knowing which
 disputes deserve one, and refusing to submit a claim that cannot be traced to a
 record. Merchants do not lose disputes because they cannot write. They lose
 because roughly two thirds have no dedicated chargeback owner, the evidence lives
