@@ -92,6 +92,76 @@ export interface DisputeDetail extends Dispute {
   };
 }
 
+export interface EvidenceGapItem {
+  kind: string;
+  state: "missing" | "stale";
+  p_win: number;
+  ev: number;
+  completeness: number;
+  unblocked: boolean;
+  flipped: boolean;
+}
+
+export interface EvidenceGaps {
+  current: {
+    p_win: number; ev: number; completeness: number;
+    blocked: boolean; recommendation: "contest" | "accept";
+  };
+  items: EvidenceGapItem[];
+  complete: boolean;
+  already_supplied: { kind: string; value: string }[];
+}
+
+export interface EvidenceResult {
+  before: Dispute;
+  after: Dispute;
+  delta: {
+    p_win: number; ev: number; completeness: number;
+    unblocked: boolean; flipped: boolean;
+  };
+  supplied?: string[];
+}
+
+export interface DraftedClaim {
+  text: string; artifact_id: string | null;
+  kind?: string | null; field?: string | null; value?: string | null;
+}
+
+export interface StrippedClaim extends DraftedClaim {
+  reason: "no_such_artifact" | "kind_mismatch" | "stale_artifact"
+        | "value_mismatch" | "unverifiable_claim";
+  actual_kind?: string | null;
+  actual_value?: string | null;
+}
+
+export interface Packet {
+  provider: string;
+  model: string | null;
+  fault_rate: number | null;
+  draft_error: string | null;
+  artifacts_retrieved: number;
+  claims_drafted: number;
+  kept: DraftedClaim[];
+  stripped: StrippedClaim[];
+  n_fabricated: number;
+  n_value_mismatch: number;
+  n_unverifiable: number;
+  hallucination_rate: number;
+  completeness: number;
+  missing_evidence: string[];
+  blocked: boolean;
+  field_check: boolean;
+  cached: boolean;
+}
+
+export const STRIP_REASON: Record<string, string> = {
+  no_such_artifact: "cited a record that does not exist",
+  kind_mismatch: "described the record as the wrong kind",
+  stale_artifact: "record is dated after the dispute",
+  value_mismatch: "stated a value the record does not contain",
+  unverifiable_claim: "named nothing that could be checked",
+};
+
 export interface Health {
   ok: boolean;
   disputes: number;
@@ -156,6 +226,17 @@ export const api = {
       `/disputes/${id}/decision`,
       { method: "POST", body: JSON.stringify({ action, actor }) }
     ),
+  evidenceGaps: (id: string) => req<EvidenceGaps>(`/disputes/${id}/evidence`),
+  evidencePreview: (id: string, items: { kind: string; value: string }[]) =>
+    req<EvidenceResult>(`/disputes/${id}/evidence/preview`,
+      { method: "POST", body: JSON.stringify({ items }) }),
+  evidenceSubmit: (id: string, items: { kind: string; value: string }[]) =>
+    req<EvidenceResult>(`/disputes/${id}/evidence`,
+      { method: "POST", body: JSON.stringify({ items }) }),
+  packet: (id: string, faultRate?: number) =>
+    req<Packet>(`/disputes/${id}/packet?force=true`
+      + (faultRate != null ? `&fault_rate=${faultRate}` : ""),
+      { method: "POST" }),
   customers: () => req<{ derived: boolean; customers: CustomerRow[] }>("/customers"),
   wallet: () => req<Wallet>("/wallet"),
   topup: (amount: number) =>

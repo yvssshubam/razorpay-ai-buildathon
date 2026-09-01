@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { DisputeDetail, api, inr, pct, shortDate, titleise } from "../api";
-import {
-  Card, CardHead, FlowStrip, Icon, Meter, Notice, P, Skeleton, StatusBadge,
-} from "../components/ui";
+import { Card, CardHead, FlowStrip, Icon, Meter, Notice, P, StatusBadge } from "../components/ui";
+import RecoveryExplorer from "../components/RecoveryExplorer";
+import EvidencePrompt from "../components/EvidencePrompt";
+import PacketDrafter from "../components/PacketDrafter";
 
 export default function Detail({
   id, onBack, onChanged, onOpen,
@@ -17,55 +18,8 @@ export default function Detail({
   const load = () => api.dispute(id).then(setD).catch((e) => setErr(e.message));
   useEffect(() => { setD(null); void load(); }, [id]);
 
-  if (err && !d) return <Notice tone="warn">{err}</Notice>;
-
-  /* A bare "Loading…" line collapses the layout and then shoves it back open
-     when the data lands. Skeletons at roughly the right size hold the space. */
-  if (!d) {
-    return (
-      <>
-        <button className="btn sm" onClick={onBack} style={{ marginBottom: 12 }}>
-          <Icon d={P.left} size={12} /> Back to queue
-        </button>
-        <div className="page-head">
-          <div className="grow">
-            <Skeleton w="52%" h={26} />
-            <Skeleton w="34%" h={13} style={{ marginTop: 8 }} />
-          </div>
-        </div>
-        <div className="split">
-          <div className="stack">
-            <Card><div className="card-body">
-              <Skeleton w={190} h={30} />
-              <div className="grid g3" style={{ marginTop: 18 }}>
-                {[0, 1, 2].map((i) => (
-                  <div key={i}>
-                    <Skeleton w="70%" h={10} />
-                    <Skeleton w="55%" h={20} style={{ marginTop: 7 }} />
-                  </div>
-                ))}
-              </div>
-              <Skeleton h={38} style={{ marginTop: 16 }} />
-              <Skeleton w="88%" h={13} style={{ marginTop: 16 }} />
-              <Skeleton w="74%" h={13} style={{ marginTop: 8 }} />
-            </div></Card>
-            <Card><div className="card-body">
-              {[0, 1, 2, 3].map((i) => (
-                <Skeleton key={i} h={34} style={{ marginTop: i ? 9 : 0 }} />
-              ))}
-            </div></Card>
-          </div>
-          <div className="stack">
-            <Card><div className="card-body">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} h={22} style={{ marginTop: i ? 10 : 0 }} />
-              ))}
-            </div></Card>
-          </div>
-        </div>
-      </>
-    );
-  }
+  if (err) return <Notice tone="warn">{err}</Notice>;
+  if (!d) return <p className="muted">Loading dispute…</p>;
 
   const act = async (action: "contest" | "accept") => {
     setBusy(true); setErr(null);
@@ -85,10 +39,6 @@ export default function Detail({
   const missing = d.evidence.filter((e) => e.state !== "verified");
   const c = d.customer_history;
   const lifetime = c.in_queue + c.prior_before_queue;
-
-  /* Derived from the API's own numbers rather than hardcoded, so the line
-     stays correct if NET_RECOVERY_FRACTION is ever changed or swept. */
-  const recoveryFrac = (d.ev.gross / (d.p_win * d.amount)).toFixed(2);
 
   return (
     <>
@@ -130,59 +80,94 @@ export default function Detail({
               Chargeback Agent
               <span className="spacer" />
               <span style={{ fontWeight: 400, opacity: 0.8 }}>
-                calibrated model &middot; EV policy
+                calibrated model · EV policy
               </span>
             </div>
             <div className="card-body">
-              <div className="verdict">{contest ? "CONTEST" : "DO NOT CONTEST"}</div>
+              {/* Merchant-facing view first: recovery and a binary verdict, with
+                  the cost model deliberately absent. The internal EV breakdown
+                  below is the same arithmetic shown in full, for the reviewer
+                  rather than the merchant. */}
+              <RecoveryExplorer d={d} />
 
-              <div className="grid g3" style={{ marginTop: 14 }}>
-                <div>
-                  <div className="eyebrow">Win probability</div>
-                  <div className="num" style={{ fontSize: 18 }}>{pct(d.p_win)}</div>
-                  <Meter value={d.p_win} tone={d.p_win > 0.6 ? "good" : d.p_win < 0.35 ? "warn" : undefined} />
-                </div>
-                <div>
-                  <div className="eyebrow">Amount at stake</div>
-                  <div className="num" style={{ fontSize: 18 }}>{inr(d.amount)}</div>
-                </div>
-                <div>
-                  <div className="eyebrow">Expected value</div>
-                  <div className="num" style={{
-                    fontSize: 18, color: d.ev.positive ? "var(--good)" : "var(--bad)",
-                  }}>
-                    {d.ev.value > 0 ? "+" : ""}{inr(d.ev.value)}
-                  </div>
-                </div>
+              {/* Only renders when something is actually missing. The panel
+                  reloads this dispute and the queue after a successful add, so
+                  the recovery figure above animates to its new value. */}
+              <EvidencePrompt
+                disputeId={d.id}
+                onChanged={() => { void load(); void onChanged(); }}
+              />
+
+              {/* Stages 3 and 4. Everything above this line is deterministic. */}
+              <PacketDrafter disputeId={d.id} />
+
+              <div className="verdict" style={{ marginTop: 18 }}>
+                {contest ? "CONTEST" : "DO NOT CONTEST"}
               </div>
 
-              {/* The arithmetic, shown rather than asserted.
+              {/* THE MERCHANT SEES NO PROBABILITY-WEIGHTED RUPEES.
+                  Recovery is binary: win and the network returns amount x 0.85,
+                  lose and it returns nothing. There is no outcome in which a
+                  merchant receives p x amount x 0.85, so putting that number in
+                  front of them names money that never changes hands. The
+                  probability governs whether contesting is worth it, which is
+                  the verdict above -- not how much comes back.
 
-                  p is printed to three decimals here, not as a rounded
-                  percentage. This line presents itself as a calculation, so it
-                  has to reconcile if someone works it through: 0.728 rounded to
-                  73% makes the product read about Rs 38 high on a Rs 22,000
-                  dispute, which looks like a bug and is not one. The headline
-                  above stays rounded -- that is a summary, not a sum. */}
+                  The full arithmetic is still here, one click away, because a
+                  reviewer should be able to check that the decision is
+                  computed rather than asserted. Collapsed by default. */}
+              <details style={{ marginTop: 14 }}>
+                <summary className="tiny faint" style={{ cursor: "pointer" }}>
+                  Show how this recommendation was calculated
+                </summary>
+
+                <div className="grid g3" style={{ marginTop: 14 }}>
+                  <div>
+                    <div className="eyebrow">Win probability</div>
+                    <div className="num" style={{ fontSize: 18 }}>{pct(d.p_win)}</div>
+                    <Meter value={d.p_win} tone={d.p_win > 0.6 ? "good" : d.p_win < 0.35 ? "warn" : undefined} />
+                  </div>
+                  <div>
+                    <div className="eyebrow">Amount at stake</div>
+                    <div className="num" style={{ fontSize: 18 }}>{inr(d.amount)}</div>
+                  </div>
+                  <div>
+                    <div className="eyebrow">Expected value</div>
+                    <div className="num" style={{
+                      fontSize: 18, color: d.ev.positive ? "var(--good)" : "var(--bad)",
+                    }}>
+                      {d.ev.value > 0 ? "+" : ""}{inr(d.ev.value)}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="tiny faint" style={{ marginTop: 12 }}>
+                  Expected value is a decision quantity, not a payout. It weighs a{" "}
+                  {inr(Math.round(d.ev.gross / Math.max(d.p_win, 1e-9)))} recovery
+                  against the chance of not getting it, to answer whether the
+                  attempt is worth its cost.
+                </p>
+
               <div className="ev-line" style={{ marginTop: 14 }}>
-                <span>{d.p_win.toFixed(3)}</span><span className="op">&times;</span>
-                <span>{inr(d.amount)}</span><span className="op">&times;</span>
-                <span>{recoveryFrac}</span>
+                <span>{pct(d.p_win)}</span><span className="op">×</span>
+                <span>{inr(d.amount)}</span><span className="op">×</span>
+                <span>{d.ev.gross / (d.p_win * d.amount) < 1 ? "0.85" : "0.85"}</span>
                 <span className="op">=</span>
                 <span>{inr(d.ev.gross)}</span>
                 {d.ev.resolve_rate != null && (
                   <>
-                    <span className="op">&times;</span>
+                    <span className="op">×</span>
                     <span>{d.ev.resolve_rate} resolved</span>
                   </>
                 )}
-                <span className="op">&minus;</span>
+                <span className="op">−</span>
                 <span>{inr(d.ev.cost)} {d.ev.cost_label}</span>
                 <span className="op">=</span>
                 <span className="res" style={{ color: d.ev.positive ? "var(--good)" : "var(--bad)" }}>
                   {d.ev.value > 0 ? "+" : ""}{inr(d.ev.value)}
                 </span>
               </div>
+              </details>
 
               <ul className="why" style={{ marginTop: 12 }}>
                 <li>
@@ -196,7 +181,7 @@ export default function Detail({
                 </li>
                 <li>
                   {d.blocked
-                    ? `Because the packet is short, this case is priced at ${inr(d.ev.cost)} — assembly plus human review — and pays out on the ${d.ev.resolve_rate} a person can resolve, not at the contest fee alone.`
+                    ? `Because the packet is short, this case is priced at ${inr(d.ev.cost)} human review and pays out on the ${d.ev.resolve_rate} a person can resolve, not at the contest fee.`
                     : `Priced at the ${inr(d.ev.cost)} contest fee, since the packet clears the rulebook and can be submitted directly.`}
                 </li>
                 {!d.address_match && <li>Billing address did not match on authorisation.</li>}
@@ -214,7 +199,7 @@ export default function Detail({
                   <div className="inline" style={{ marginTop: 16 }}>
                     <button className="btn pri lg" style={{ flex: 1 }} disabled={busy}
                             onClick={() => void act("contest")}>
-                      {busy ? "Working…" : <>Contest chargeback &middot; {inr(d.ev.cost)}</>}
+                      Contest chargeback · {inr(d.ev.cost)}
                     </button>
                     <button className="btn lg" style={{ flex: 1 }} disabled={busy}
                             onClick={() => void act("accept")}>
@@ -335,32 +320,19 @@ export default function Detail({
               </div>
             </div>
             <div>
-              {c.items.map((it) => {
-                const clickable = !it.is_current;
-                return (
-                  <div className="row" key={it.id}
-                       data-click={clickable ? "1" : "0"}
-                       {...(clickable ? {
-                         role: "link" as const,
-                         tabIndex: 0,
-                         "aria-label": `Open dispute ${it.id}`,
-                         onClick: () => onOpen(it.id),
-                         onKeyDown: (e: React.KeyboardEvent) => {
-                           if (e.key === "Enter" || e.key === " ") {
-                             e.preventDefault(); onOpen(it.id);
-                           }
-                         },
-                       } : {})}
-                       style={{ cursor: clickable ? "pointer" : "default" }}>
-                    <div className="grow">
-                      <div className="t mono">{it.id}{it.is_current && " · this one"}</div>
-                      <div className="s mono tiny">{it.reason_code}</div>
-                    </div>
-                    <span className="num tiny">{inr(it.amount)}</span>
-                    <StatusBadge s={it.status} />
+              {c.items.map((it) => (
+                <div className="row" key={it.id}
+                     data-click={it.is_current ? "0" : "1"}
+                     onClick={() => !it.is_current && onOpen(it.id)}
+                     style={{ cursor: it.is_current ? "default" : "pointer" }}>
+                  <div className="grow">
+                    <div className="t mono">{it.id}{it.is_current && " · this one"}</div>
+                    <div className="s mono tiny">{it.reason_code}</div>
                   </div>
-                );
-              })}
+                  <span className="num tiny">{inr(it.amount)}</span>
+                  <StatusBadge s={it.status} />
+                </div>
+              ))}
               {c.prior_before_queue > 0 && (
                 <div className="row">
                   <div className="grow s">

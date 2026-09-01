@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import adapter
+import evidence
+import packet as packet_mod
 from store import STORE
 
 app = FastAPI(title="Chargeback Triage and Evidence Agent", version="1.0")
@@ -48,7 +50,7 @@ def _decorate(s: dict) -> dict:
 
 def _all_scored() -> list[dict]:
     rows, _ = adapter.load_disputes()
-    return [_decorate(adapter.summary(d)) for d in rows]
+    return [_decorate(adapter.summary(evidence.hydrate(d))) for d in rows]
 
 
 # --------------------------------------------------------------------------
@@ -78,7 +80,7 @@ def list_disputes(limit: int = 150):
 
 @app.get("/api/disputes/{dispute_id}")
 def get_dispute(dispute_id: str):
-    d = adapter.find(dispute_id)
+    d = evidence.hydrate(adapter.find(dispute_id))
     if d is None:
         raise HTTPException(404, "No such dispute")
     out = _decorate(adapter.detail(d))
@@ -120,6 +122,113 @@ def decide(dispute_id: str, body: Decision):
     except ValueError as exc:
         raise HTTPException(409, str(exc))
     return {**r, "wallet": STORE.wallet()}
+
+
+# -- merchant-supplied evidence --------------------------------------------
+#
+# The structural block floor is 40% of the queue: packets that block on
+# evidence timestamped after the dispute, or that never existed. No drafting
+# improvement removes that share -- but the merchant has the missing record.
+# These three routes are the only place in the product where a user action
+# changes a score, so read the _INTEGRITY block in evidence.py before touching
+# them.
+
+class EvidenceItem(BaseModel):
+    kind: str
+    value: str
+    created_day: int | None = None
+    api_field: str | None = None
+
+
+class EvidenceBody(BaseModel):
+    items: list[EvidenceItem]
+
+
+def _dispute_or_404(dispute_id: str) -> dict:
+    d = evidence.hydrate(adapter.find(dispute_id))
+    if d is None:
+        raise HTTPException(404, "No such dispute")
+    return d
+
+
+@app.get("/api/disputes/{dispute_id}/evidence")
+def evidence_gaps(dispute_id: str):
+    """What is missing, and what each record is worth on its own."""
+    return {**evidence.opportunities(_dispute_or_404(dispute_id)),
+            "already_supplied": evidence.supplied_for(dispute_id)}
+
+
+@app.post("/api/disputes/{dispute_id}/evidence/preview")
+def evidence_preview(dispute_id: str, body: EvidenceBody):
+    """What WOULD change. Writes nothing, logs nothing, decides nothing."""
+    try:
+        return evidence.preview(_dispute_or_404(dispute_id),
+                                [i.model_dump() for i in body.items])
+    except evidence.EvidenceError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/disputes/{dispute_id}/evidence")
+def evidence_commit(dispute_id: str, body: EvidenceBody):
+    d = _dispute_or_404(dispute_id)
+    if STORE.state_of(dispute_id) != "open":
+        raise HTTPException(409, "This dispute has already been decided")
+    try:
+        r = evidence.commit(adapter.find(dispute_id),
+                            [i.model_dump() for i in body.items])
+    except evidence.EvidenceError as exc:
+        raise HTTPException(400, str(exc))
+
+    # Logged with provenance, because a reviewer asking which records the
+    # system retrieved and which the merchant handed over should not have to
+    # infer it.
+    STORE.log("evidence.supplied", dispute_id, {
+        "actor": "merchant",
+        "kinds": [i.kind for i in body.items],
+        "p_win_before": r["before"]["p_win"],
+        "p_win_after": r["after"]["p_win"],
+        "blocked_before": r["before"]["blocked"],
+        "blocked_after": r["after"]["blocked"],
+        "recommendation_before": r["before"]["recommendation"],
+        "recommendation_after": r["after"]["recommendation"],
+    })
+    return r
+
+
+# -- drafting and verification (stages 3 and 4) ----------------------------
+#
+# The rest of serve/ runs the deterministic half of the pipeline. This route
+# runs the half that a model touches: an LLM drafts claims against the
+# retrieved artifacts, then the five deterministic checks decide what survives
+# and whether the packet may be submitted at all.
+#
+# On demand, one dispute at a time, because a Gemini call costs a second and
+# the free tier allows 500 a day.
+
+
+@app.post("/api/disputes/{dispute_id}/packet")
+def build_packet(dispute_id: str, fault_rate: float | None = None,
+                 force: bool = False):
+    d = evidence.hydrate(adapter.find(dispute_id))
+    if d is None:
+        raise HTTPException(404, "No such dispute")
+
+    r = packet_mod.build(d, fault_rate=fault_rate, force=force)
+
+    # Logged whether or not it blocked. A packet that was drafted and refused
+    # is the event most worth having in an audit trail, not the least.
+    if not r["cached"]:
+        STORE.log("packet.drafted", dispute_id, {
+            "provider": r["provider"],
+            "claims_drafted": r["claims_drafted"],
+            "kept": len(r["kept"]),
+            "stripped": len(r["stripped"]),
+            "hallucination_rate": r["hallucination_rate"],
+            "blocked": r["blocked"],
+            "missing_evidence": r["missing_evidence"],
+            "fault_rate": r["fault_rate"],
+        })
+    return r
 
 
 # -- customers -------------------------------------------------------------
@@ -212,4 +321,7 @@ def settle():
 @app.post("/api/simulate/reset")
 def reset():
     STORE.reset()
+    evidence.reset()
+    packet_mod.reset()
+    adapter._SCORES.clear()
     return {"ok": True}

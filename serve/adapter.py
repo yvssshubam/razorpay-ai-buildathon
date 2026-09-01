@@ -159,12 +159,31 @@ def _day_to_date(day: int) -> str:
 
 def evidence_view(d: dict) -> list[dict]:
     """Per required-evidence-kind status, using the same support test as
-    baselines._build_packet: present AND created before the dispute."""
+    baselines._build_packet: present AND created before the dispute.
+
+    WHEN A KIND HAS MORE THAN ONE ARTIFACT, THE SUPPORTING ONE WINS. This used
+    to be a plain setdefault, i.e. first-artifact-wins, and that quietly
+    disagreed with the pipeline: _build_packet takes the SET of kinds over all
+    supported artifacts, so one stale copy and one good copy of the same kind
+    satisfies the rulebook there while displaying as 'stale' here. The
+    generated data never produces a duplicate kind, so the divergence was
+    latent -- but merchant-supplied evidence creates exactly that shape by
+    design, and a merchant who hands over the missing record has to see it
+    land. Any supporting artifact wins; otherwise the first is shown, so the
+    state still reports why it does not count.
+    """
     arts = d.get("artifacts") or {}
     dday = d.get("dispute_day", 0)
+
+    def _supports(a: dict) -> bool:
+        return bool(a.get("present")) and a.get("created_day", 0) < dday
+
     by_kind: dict[str, dict] = {}
     for aid, a in arts.items():
-        by_kind.setdefault(a.get("kind"), {"artifact_id": aid, **a})
+        kind = a.get("kind")
+        cur = by_kind.get(kind)
+        if cur is None or (_supports(a) and not _supports(cur)):
+            by_kind[kind] = {"artifact_id": aid, **a}
 
     meta = code_meta(d.get("reason_code"))
     slots = meta.get("required_evidence") or {}

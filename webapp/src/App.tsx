@@ -7,15 +7,13 @@ import Detail from "./pages/Detail";
 import Customers from "./pages/Customers";
 import WalletPage from "./pages/Wallet";
 
-type Page = "dashboard" | "payments" | "chargebacks" | "customers" | "wallet" | "settings";
+type Page = "dashboard" | "chargebacks" | "customers" | "wallet";
 
 const NAV: { key: Page; label: string; icon: string; group: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: P.grid, group: "Overview" },
-  { key: "payments", label: "Payments", icon: P.card, group: "Overview" },
   { key: "chargebacks", label: "Chargebacks", icon: P.shield, group: "Disputes" },
   { key: "customers", label: "Customers", icon: P.users, group: "Disputes" },
   { key: "wallet", label: "Contest wallet", icon: P.wallet, group: "Disputes" },
-  { key: "settings", label: "Settings", icon: P.cog, group: "Account" },
 ];
 
 const Mark = () => (
@@ -198,21 +196,9 @@ export default function App() {
               <Chargebacks disputes={disputes} onOpen={openDispute} />
             ) : page === "customers" ? (
               <Customers onOpen={openDispute} />
-            ) : page === "wallet" ? (
+            ) : (
               <WalletPage wallet={wallet} policy={policy} preview={preview}
                           health={health} onChanged={refresh} />
-            ) : (
-              <>
-                <div className="page-head">
-                  <div className="grow">
-                    <h1 className="h1">{NAV.find((n) => n.key === page)?.label}</h1>
-                    <p className="sub">Outside the scope of this prototype.</p>
-                  </div>
-                </div>
-                <div className="card">
-                  <Empty />
-                </div>
-              </>
             )}
           </div>
         )}
@@ -220,12 +206,3 @@ export default function App() {
     </div>
   );
 }
-
-const Empty = () => (
-  <div className="empty">
-    <h2 className="h2">Nothing here yet</h2>
-    <p className="sub">
-      This build covers the dispute loop end to end. Payments and account settings are stubs.
-    </p>
-  </div>
-);
