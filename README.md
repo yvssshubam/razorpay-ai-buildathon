@@ -304,12 +304,21 @@ joint effect once, not twice. The results are ranked by that value, and the ones
 with a positive price carry it in the interface.
 
 **It prices and labels; it does not filter, and that is deliberate.** Across the
-queue 688 items are surfaced and only 333 of them price above zero. The other
-355 price at exactly zero *because they were priced alone*: on a dispute missing
-four documents, no single one unblocks the packet, so each is individually worth
-nothing while the set is worth a great deal. Showing only positive-EV items
-would hide precisely the documents a merchant has to supply together. The
-ranking is the judgement; the list is the honest input to it.
+queue 688 items are surfaced. 333 price above zero, **290 price at exactly
+zero**, and **65 price marginally negative**, between −₹1.43 and −₹154.74.
+
+The 290 are zero *because they were priced alone*, and every one of them sits on
+a dispute missing two or more documents: no single record unblocks the packet,
+so each is individually worth nothing while the set is worth a great deal. The
+65 are a quirk of the classifier rather than of the evidence. Adding a record
+moves `n_present`, `n_missing` and `completeness` together, and the learned model
+is not monotone in that move, so a handful of probes come back very slightly
+lower. It is a small, measured illustration of the point made above: the
+classifier is a replaceable component with quirks, not the source of the value.
+
+Filtering on positive EV would therefore hide precisely the documents a merchant
+has to supply together. The ranking is the judgement; the list is the honest
+input to it.
 
 That is still a decision rather than a form, and the concrete case is the
 clearest way to see it. On `D00015` one record is priced at ₹811 against a case

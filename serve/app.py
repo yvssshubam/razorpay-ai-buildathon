@@ -36,7 +36,8 @@ def _warm() -> None:
     m = adapter.model_status()
     print(f"[serve] {len(rows)} disputes from {path}")
     print(f"[serve] p(win) source: {m['source']}"
-          + (f" (ECE {m['validation']['ece']:.3f})" if m["source"] == "learned" else ""))
+          + (f" (validation ECE {m['validation']['ece']:.3f})"
+             if m["source"] == "learned" else ""))
     if m["source"] != "learned":
         print("[serve] WARNING: models/p_win.pkl not found. Numbers shown are "
               "the hand-written heuristic, not the calibrated model.")
