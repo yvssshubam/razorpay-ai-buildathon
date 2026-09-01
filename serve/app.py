@@ -227,6 +227,8 @@ def build_packet(dispute_id: str, fault_rate: float | None = None,
             "blocked": r["blocked"],
             "missing_evidence": r["missing_evidence"],
             "fault_rate": r["fault_rate"],
+            "merchant_artifacts": r["merchant_artifacts"],
+            "depends_on_merchant_evidence": r["depends_on_merchant_evidence"],
         })
     return r
 

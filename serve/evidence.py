@@ -13,8 +13,13 @@ not the policy. A merchant who supplies nothing gets the same honest
 recommendation they would have got anyway; a merchant who supplies a real record
 gets a better one because the case is genuinely stronger. Nothing here nags.
 
-WHAT THIS IS NOT: a way to improve the score by asserting things. Read
-_INTEGRITY below before changing anything in this file.
+WHAT THIS IS. A trust boundary. A merchant CAN move their own p(win) by
+asserting a record that does not exist -- measured, reproducible, and
+unclosable, because there is no ground truth to check a merchant-only record
+against. What the system does instead is refuse to hide it: provenance is
+marked permanently, and a packet that clears the rulebook only because of
+merchant-asserted records says so. Read _INTEGRITY below before changing
+anything in this file, and do not restore the claim that check 4 catches this.
 """
 from __future__ import annotations
 
@@ -33,32 +38,44 @@ import adapter  # noqa: E402
 # _INTEGRITY
 #
 # This endpoint is the one place in the product where a user action moves
-# p(win). That makes it the one place worth attacking, so three rules hold:
+# p(win). It is therefore a TRUST BOUNDARY, and the honest description of it is
+# the one below -- not the one this comment used to carry.
 #
-# 1. THE MERCHANT SUPPLIES A VALUE, NOT A TICK. A checkbox saying "yes I have
-#    the delivery confirmation" would let anyone inflate their own score by
-#    asserting. The record must carry a value, and that value is what the
-#    verifier will later compare a drafted claim against. If the merchant
-#    invents it, check 4 strips the claim that cites it and the packet blocks
-#    for the same reason it blocked before. The fabrication surface is closed
-#    by the gate that already exists, not by a new one.
+# 1. MERCHANT-SUPPLIED RECORDS ARE ASSERTIONS, NOT VERIFIED FACTS. An earlier
+#    version of this note claimed that a merchant who invents a value would be
+#    caught, because "check 4 strips the claim that cites it and the packet
+#    blocks". THAT WAS FALSE, and it was disproved with one request: filing
+#    INVENTED-99999 against D00003's missing record produced 5 claims drafted,
+#    0 stripped, packet submittable, p(win) 0.137 -> 0.639.
 #
-# 2. SUPPLIED ARTIFACTS ARE MARKED, PERMANENTLY. Provenance is 'merchant' and
-#    is carried on the artifact itself, so it survives into the packet, the
-#    audit line, and anything reading the record downstream. A reviewer asking
-#    "which of these did the system retrieve and which did the merchant hand
-#    over" gets an answer without inference.
+#    The reason is architectural rather than a bug. The five checks verify a
+#    CLAIM against a RECORD. Here the record is the lie, so a faithful claim
+#    about it passes every check honestly. There is no ground truth to compare
+#    a merchant-only artifact against, so no check can close this -- not this
+#    one, not a better one. The gate closes MODEL fabrication. It does not and
+#    cannot close MERCHANT fabrication.
 #
-# 3. THE PREVIEW IS NOT A DECISION. preview() mutates nothing. It answers "what
-#    would p(win) be", and the caller can walk away. Only commit() writes, and
-#    only commit() logs.
+#    Requiring a value rather than a tick is therefore not a security control.
+#    It is a friction and an evidence trail: the merchant has to state
+#    something specific that a card network can later contradict, and that
+#    statement is on the record with their name against it.
 #
-# One more constraint, on dates. A supplied record dated on or after the
-# dispute is STALE by the same rule that made it stale when the pipeline found
-# it, and stale evidence does not satisfy the rulebook. So a merchant cannot
-# fix a late record by re-submitting it. That is enforced here rather than
-# trusted to the caller, because it is exactly the shortcut a rushed frontend
-# would take.
+# 2. SO PROVENANCE IS THE ACTUAL CONTROL, AND IT IS PERMANENT. Every supplied
+#    artifact carries provenance='merchant' on the artifact itself, so it
+#    survives into the packet, the audit line, and anything reading the record
+#    downstream. serve/packet.py additionally reports whether the packet clears
+#    the rulebook ONLY because of merchant-asserted records. A reviewer asking
+#    "which of these did the system retrieve and which did the merchant assert"
+#    always gets an answer without inference. Removing or weakening the
+#    provenance marking removes the only real control here.
+#
+# 3. THE PREVIEW IS NOT A DECISION. preview() mutates nothing. Only commit()
+#    writes, and only commit() logs.
+#
+# One constraint is enforceable and is enforced: a supplied record dated on or
+# after the dispute is STALE by the same rule that made it stale when the
+# pipeline found it, and stale evidence does not satisfy the rulebook. A
+# merchant cannot fix a late record by re-submitting it with a new date.
 # ---------------------------------------------------------------------------
 
 MERCHANT = "merchant"
@@ -98,7 +115,11 @@ def _inject(d: dict, items: list[dict]) -> dict:
         if not value:
             raise EvidenceError(f"{kind!r} needs the record's value, not a tick")
 
-        # See _INTEGRITY note 1: dated before the dispute or it is stale, and
+        # Requiring a value is friction and an evidence trail, NOT verification.
+        # See _INTEGRITY note 1: nothing downstream can check this against
+        # reality.
+
+        # Dated before the dispute or it is stale, and
         # stale evidence does not satisfy the rulebook. Default to one day
         # before rather than to 'now', which would silently be stale.
         day = it.get("created_day")

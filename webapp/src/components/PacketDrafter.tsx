@@ -100,6 +100,22 @@ export default function PacketDrafter({ disputeId }: Props) {
             </div>
           </div>
 
+          {pk.depends_on_merchant_evidence && (
+            <div className="notice warn" style={{ marginTop: 12 }}>
+              <Icon d={P.alert} />
+              <div>
+                <b>Clears the rulebook only because of records you supplied</b>
+                <div className="tiny" style={{ marginTop: 4 }}>
+                  The checks confirm each claim matches its record. They cannot
+                  confirm a record you provided is real — nothing can, so this is
+                  stated rather than checked. {pk.merchant_artifacts} supplied
+                  {pk.merchant_artifacts === 1 ? " record is" : " records are"} marked
+                  in the audit trail.
+                </div>
+              </div>
+            </div>
+          )}
+
           {pk.stripped.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <div className="eyebrow">Refused by the verifier</div>

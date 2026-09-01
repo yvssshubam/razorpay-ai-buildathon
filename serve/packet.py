@@ -57,7 +57,19 @@ def provider_name() -> str:
 
 
 def build(d: dict, fault_rate: float | None = None, force: bool = False) -> dict:
-    """Draft a packet for one dispute and run the five checks over it."""
+    """Draft a packet for one dispute and run the five checks over it.
+
+    fault_rate=None means NO FAULTS, not "use whatever CB_FAULT_RATE happens to
+    hold". MockProvider defaults to 0.15 when the variable is unset
+    (agent/llm.py), which is right for the eval harness -- that always sets the
+    variable explicitly -- and wrong here: it meant the plain "draft this
+    packet" button injected hallucinations nobody asked for, so the default
+    demo path showed a blocked packet and a stripped claim with no fault button
+    pressed. Worse, if a Gemini quota runs out mid-demo and the provider falls
+    back to mock, an unrequested 15% fault rate looks exactly like the language
+    model failing.
+    """
+    fault_rate = 0.0 if fault_rate is None else float(fault_rate)
     supplied = sum(1 for a in (d.get("artifacts") or {}).values()
                    if a.get("provenance") == "merchant")
     key = (d["dispute_id"], provider_name(), fault_rate, supplied)
@@ -69,20 +81,36 @@ def build(d: dict, fault_rate: float | None = None, force: bool = False) -> dict
     # blocked packet on demand; it is restored immediately so one request
     # cannot change how the next one behaves.
     prev = os.environ.get("CB_FAULT_RATE")
-    if fault_rate is not None:
-        os.environ["CB_FAULT_RATE"] = str(fault_rate)
+    os.environ["CB_FAULT_RATE"] = str(fault_rate)
     try:
         provider = _llm.get_provider()
         claims, err = draft_claims(d, provider, seed=abs(hash(d["dispute_id"])) % 10_000)
     finally:
-        if fault_rate is not None:
-            if prev is None:
-                os.environ.pop("CB_FAULT_RATE", None)
-            else:
-                os.environ["CB_FAULT_RATE"] = prev
+        if prev is None:
+            os.environ.pop("CB_FAULT_RATE", None)
+        else:
+            os.environ["CB_FAULT_RATE"] = prev
 
     r = verify(d, claims)
     retrieved = retrieve(d)
+
+    # THE TRUST BOUNDARY, MADE VISIBLE.
+    #
+    # The five checks verify a CLAIM against a RECORD. They cannot verify a
+    # record against reality, and for merchant-supplied records the merchant
+    # is the only source of that record. So a faithful claim about an invented
+    # value passes every check -- not a bug, an unclosable gap: there is no
+    # ground truth to compare a merchant-only artifact against.
+    #
+    # What CAN be done is refuse to hide it. If the packet only clears the
+    # rulebook because of records the merchant asserted, say so, here and in
+    # the audit line, so nobody reads "verified" as "corroborated".
+    merchant_ids = {aid for aid, a in retrieved.items()
+                    if a.get("provenance") == "merchant"}
+    kept_kinds_sys = {c.get("verified_kind") for c in r["kept"]
+                      if c["artifact_id"] not in merchant_ids}
+    required = set(d.get("required_evidence") or [])
+    depends = bool(merchant_ids) and not required.issubset(kept_kinds_sys)
 
     out = {
         "provider": provider_name(),
@@ -112,6 +140,8 @@ def build(d: dict, fault_rate: float | None = None, force: bool = False) -> dict
         "missing_evidence": r["missing_evidence"],
         "blocked": r["blocked"],
         "field_check": os.environ.get("CB_FIELD_CHECK", "on").lower() != "off",
+        "merchant_artifacts": len(merchant_ids),
+        "depends_on_merchant_evidence": depends,
         "cached": False,
     }
     _CACHE[key] = out

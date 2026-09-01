@@ -15,13 +15,20 @@ import { Icon, P } from "./ui";
  * badge, no blocking modal, no red state. A merchant who ignores this panel
  * loses nothing they were entitled to.
  *
- * WHAT IT PROMISES, AND WHAT IT DOES NOT. It says the packet stops going to a
- * human and states the change in recovery. It does NOT claim to raise the win
- * probability, because with the current model it does not: packet_blocked and
- * frac_stale have zero permutation sensitivity, and the model's completeness
- * feature counts present_evidence regardless of staleness. All of the movement
- * is through the packet path. Claiming otherwise would be an overstatement a
- * reviewer could disprove by dragging one slider.
+ * WHAT IT PROMISES. That the packet stops needing a person, and the change in
+ * recovery. It deliberately does not lead with the win probability, even
+ * though for a MISSING record that moves a great deal (+0.31 mean across 269
+ * disputes, up to +0.84) -- because for a STALE record it moves by exactly
+ * 0.000 across all 47 of them, for the reasons in README section 4. One
+ * sentence cannot be true of both, and the packet claim is true of both.
+ *
+ * WHAT IT MUST NOT PROMISE. That what the merchant types is verified. It is
+ * not, and cannot be. The five checks compare a claim against a record; for a
+ * merchant-supplied record the merchant IS the source, so a faithful claim
+ * about an invented value passes every check. This panel previously carried a
+ * line saying otherwise and it was false. Provenance marking, not
+ * verification, is the control -- see the _INTEGRITY note in
+ * serve/evidence.py.
  */
 
 type Props = { disputeId: string; onChanged: () => void };
@@ -125,9 +132,9 @@ export default function EvidencePrompt({ disputeId, onChanged }: Props) {
       </div>
 
       <p className="tiny faint" style={{ marginTop: 12 }}>
-        What you enter is checked against the packet before anything is submitted.
-        A reference that does not match the record is removed and the packet goes
-        to a person, exactly as it would have without it.
+        Records you add are marked as supplied by you, and stay marked in the
+        audit trail and on the packet. Only add references you can produce if the
+        bank asks — a representment is evidence submitted to a card network.
       </p>
     </section>
   );

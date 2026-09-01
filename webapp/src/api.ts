@@ -151,6 +151,8 @@ export interface Packet {
   missing_evidence: string[];
   blocked: boolean;
   field_check: boolean;
+  merchant_artifacts: number;
+  depends_on_merchant_evidence: boolean;
   cached: boolean;
 }
 
