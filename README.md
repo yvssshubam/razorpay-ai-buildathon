@@ -259,10 +259,21 @@ CB_P_WIN=heuristic python eval/run_eval.py --data data/holdout.jsonl
 | heuristic | **531,493** | 0.770 | 0.1939 | 0.0848 | 423/348/29 |
 | calibrated model | 526,279 | 0.803 | 0.1744 | 0.0337 | 392/370/38 |
 
-**The heuristic nets ₹5,214 more.** Bootstrapped over 2,000 resamples that gap
-has a 95% CI of **[−₹13,233, +₹21,871]**, with 547 of 2,000 draws at or below
-zero. The two are not distinguishable on net rupees, and anyone claiming the
-model wins on this metric is reading noise.
+**The heuristic nets ₹5,214 more.** The two policies score the same 800
+disputes, so the difference is taken per dispute and then resampled, 2,000
+times. That gives a 95% CI of **[−₹13,233, +₹21,871]**, with 547 of 2,000 draws
+at or below zero. The two are not distinguishable on net rupees, and anyone
+claiming the model wins on this metric is reading noise.
+
+```
+python eval/run_eval.py --data data/holdout.jsonl --ablation
+```
+
+The interval is a Monte Carlo estimate, so the bounds move by a few hundred
+rupees across seeds (7, 41 and 99 give [−13,233, +21,871], [−13,569, +21,570]
+and [−13,666, +22,103], with 547, 557 and 549 draws at or below zero). The
+conclusion does not move. Default seed is 7; `--n-boot` changes the resample
+count.
 
 What the model does win is calibration: **ECE 0.034 against 0.085, Brier 0.174
 against 0.194**. That matters here specifically, because the EV rule multiplies
