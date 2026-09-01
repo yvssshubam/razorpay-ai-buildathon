@@ -295,22 +295,30 @@ timestamped after the dispute or never existed, and that no drafting
 improvement removes it. The merchant is the only party who can. So the
 dashboard asks. Optionally, once, without nagging.
 
-**What the system is doing there is deciding what information is worth
-acquiring.** For every missing document, `serve/evidence.py::opportunities()`
-injects a probe record, re-scores the dispute through the same classifier and
-the same EV rule, and prices that document by the expected value it would
-unlock. Each is priced alone rather than cumulatively, because two documents
-that block the same packet are worth their joint effect once, not twice. The
-results are ranked by that value and only the ones worth having are surfaced.
+**What the system is doing there is pricing information.** For every missing
+document, `serve/evidence.py::opportunities()` injects a probe record, re-scores
+the dispute through the same classifier and the same EV rule, and prices that
+document by the expected value it would unlock. Each is priced alone rather than
+cumulatively, because two documents that block the same packet are worth their
+joint effect once, not twice. The results are ranked by that value, and the ones
+with a positive price carry it in the interface.
 
-That is a decision, not a form. The system does not ask for everything it lacks;
-it computes what each missing record is worth and asks for what clears the bar.
-The acquisition itself runs through the merchant, because a document that was
-never written cannot be retrieved by any amount of searching. On `D00015` one
-record is priced at ₹811 against a case sitting at −₹728, and supplying it flips
-the recommendation. That is the same expected-value machinery that drives Stage
-1, pointed at a different question: not *should we contest this*, but *what is
-it worth knowing before we decide*.
+**It prices and labels; it does not filter, and that is deliberate.** Across the
+queue 688 items are surfaced and only 333 of them price above zero. The other
+355 price at exactly zero *because they were priced alone*: on a dispute missing
+four documents, no single one unblocks the packet, so each is individually worth
+nothing while the set is worth a great deal. Showing only positive-EV items
+would hide precisely the documents a merchant has to supply together. The
+ranking is the judgement; the list is the honest input to it.
+
+That is still a decision rather than a form, and the concrete case is the
+clearest way to see it. On `D00015` one record is priced at ₹811 against a case
+sitting at −₹728, and supplying it flips the recommendation from accept to
+contest. The acquisition itself runs through the merchant, because a document
+that was never written cannot be retrieved by any amount of searching. This is
+the same expected-value machinery that drives Stage 1, pointed at a different
+question: not *should we contest this*, but *what is it worth knowing before we
+decide*.
 
 Measured across the 800:
 
