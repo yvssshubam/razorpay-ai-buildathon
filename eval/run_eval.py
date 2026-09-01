@@ -66,6 +66,19 @@ def print_scorecard(disputes, cost):
         print(f"  {r['policy']:<13}{_fmt(r['completeness'], 9)}{_fmt(r['hallucination'], 9)}"
               f"{pr_w:>16}{pr_e:>14}{r['net_rupees']:>13,.0f}{mix:>16}")
 
+    # The track brief asks for this by name: rupees spent contesting losers,
+    # plus rupees forfeited by accepting winnable cases. It is not a derived
+    # footnote -- it is the false-positive cost, and the split between the two
+    # columns is the triage story. contest-all wastes contests; the agent
+    # forfeits wins instead, and forfeits less than the waste it avoids.
+    print("\n  Cost of being wrong (Rs):")
+    print(f"    {'policy':<13}{'paid to lose':>16}{'left behind':>15}{'total':>14}")
+    print("    " + "-" * 58)
+    for r in results:
+        c = r["cost_wrong"]
+        print(f"    {r['policy']:<13}{c['paid_to_lose']:>16,.0f}"
+              f"{c['left_behind']:>15,.0f}{c['total']:>14,.0f}")
+
     a = next(r for r in results if r["policy"] == "agent")
     print("\n  Agent, per tier:")
     print(f"    {'tier':<6}{'n':>5}{'P/R winnable':>15}{'P/R ev':>12}{'net Rs':>14}")
@@ -74,6 +87,81 @@ def print_scorecard(disputes, cost):
         pe = f"{row['precision_ev']:.2f}/{row['recall_ev']:.2f}"
         print(f"    {t:<6}{row['n']:>5}{pw:>15}{pe:>12}{row['net_rupees']:>14,.0f}")
     return results
+
+
+def bootstrap(disputes, cost, n_boot=2000, seed=13):
+    """95% CI on (agent - contest_all), by resampling the 800 with replacement.
+
+    WHY THIS IS NEEDED. The headline gap is a sum over a heavy-tailed amount
+    distribution (p99/median = 13.5 in the generated data, 15.3 in IEEE-CIS).
+    A sum like that is dominated by a handful of large wins, so "what if the
+    three biggest disputes had flipped?" is the obvious attack. Decisions are
+    per-dispute and independent of the other rows, so the decisions are made
+    ONCE on the full set and only the scoring is resampled -- re-running the
+    policy per bootstrap draw would be identical work at 2000x the cost.
+    """
+    import random as _r
+    dec_a = run_policy(disputes, "agent", cost)
+    dec_c = run_policy(disputes, "contest_all", cost)
+
+    rng = _r.Random(seed)
+    n = len(disputes)
+    gaps = []
+    for _ in range(n_boot):
+        idx = [rng.randrange(n) for _ in range(n)]
+        ds = [disputes[i] for i in idx]
+        gaps.append(metrics.net_rupee_impact(ds, [dec_a[i] for i in idx], cost)
+                    - metrics.net_rupee_impact(ds, [dec_c[i] for i in idx], cost))
+    gaps.sort()
+    lo, hi = gaps[int(0.025 * n_boot)], gaps[int(0.975 * n_boot) - 1]
+    point = (metrics.net_rupee_impact(disputes, dec_a, cost)
+             - metrics.net_rupee_impact(disputes, dec_c, cost))
+    neg = sum(1 for g in gaps if g <= 0)
+
+    print(f"\n  Bootstrap · {n_boot:,} resamples of n={n} · agent - contest_all\n")
+    print(f"    point estimate      Rs {point:>12,.0f}")
+    print(f"    95% CI              Rs {lo:>12,.0f}  to  Rs {hi:,.0f}")
+    print(f"    draws where the gap is <= 0      {neg} / {n_boot}")
+    return dict(point=point, lo=lo, hi=hi, n_boot=n_boot, n_negative=neg)
+
+
+def ev_sweep(disputes, cost, json_out=None):
+    """Two-sided sweep of the accept/contest boundary, -Rs 300 to +Rs 300.
+
+    The confidence-floor sweep peaks at 0.00, which is the bottom of its own
+    range, and a maximum sitting on a boundary is not a demonstrated maximum.
+    This sweeps the EV threshold in both directions so the optimum is interior
+    or is shown not to be.
+    """
+    import os as _os
+    prev = _os.environ.get("CB_EV_THRESHOLD")
+    rows = []
+    print(f"\n  EV-threshold sweep · n={len(disputes)} · contest if ev > T\n")
+    print(f"  {'T (Rs)':>8}{'net rupees':>14}{'sub':>7}{'acc':>7}{'esc':>7}")
+    print("  " + "-" * 45)
+    try:
+        for t in range(-300, 301, 50):
+            _os.environ["CB_EV_THRESHOLD"] = str(t)
+            dec = run_policy(disputes, "agent", cost)
+            net = metrics.net_rupee_impact(disputes, dec, cost)
+            m = metrics.outcome_mix(dec)
+            rows.append(dict(threshold=t, net_rupees=net, **m))
+            print(f"  {t:>8,}{net:>14,.0f}{m['submitted']:>7}"
+                  f"{m['accepted']:>7}{m['escalated']:>7}")
+    finally:
+        if prev is None:
+            _os.environ.pop("CB_EV_THRESHOLD", None)
+        else:
+            _os.environ["CB_EV_THRESHOLD"] = prev
+
+    best = max(rows, key=lambda r: r["net_rupees"])
+    interior = rows[0]["threshold"] < best["threshold"] < rows[-1]["threshold"]
+    print(f"\n  Best T = Rs {best['threshold']:,} at Rs {best['net_rupees']:,.0f}"
+          f"  ({'interior optimum' if interior else 'ON THE BOUNDARY -- extend the range'})")
+    if json_out:
+        json.dump(rows, open(json_out, "w"), indent=2)
+        print(f"  wrote {json_out}")
+    return rows
 
 
 def sweep(disputes, chart_path=None, json_out=None):
@@ -133,6 +221,9 @@ def main():
     ap.add_argument("--data", default="../data/holdout.jsonl")
     ap.add_argument("--contest-cost", type=float, default=dist.CONTEST_COST)
     ap.add_argument("--sweep", action="store_true")
+    ap.add_argument("--ev-sweep", action="store_true")
+    ap.add_argument("--bootstrap", action="store_true")
+    ap.add_argument("--n-boot", type=int, default=2000)
     ap.add_argument("--chart", default=None)
     ap.add_argument("--json-out", default=None)
     args = ap.parse_args()
@@ -140,6 +231,13 @@ def main():
     disputes = load(args.data)
     if args.sweep:
         sweep(disputes, args.chart, args.json_out)
+    elif args.ev_sweep:
+        ev_sweep(disputes, args.contest_cost, args.json_out)
+    elif args.bootstrap:
+        r = bootstrap(disputes, args.contest_cost, args.n_boot)
+        if args.json_out:
+            json.dump(r, open(args.json_out, "w"), indent=2)
+            print(f"  wrote {args.json_out}")
     else:
         res = print_scorecard(disputes, args.contest_cost)
         if args.json_out:

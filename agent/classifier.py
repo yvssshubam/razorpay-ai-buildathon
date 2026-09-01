@@ -154,6 +154,48 @@ def train(train_path, out_path, chart_path=None, seed=7):
     print(f"\nwrote {out_path}")
 
 
+def evaluate_holdout(holdout_path, model_path=None, chart_path=None):
+    """Calibration on the 800 the model never saw.
+
+    WHY THIS EXISTS SEPARATELY FROM train(). train() reports AUC / Brier / ECE
+    on an internal 25% split of the TRAINING file. That is the right number for
+    model selection and the wrong number to quote as evidence that the EV rule
+    is being fed trustworthy probabilities, because the holdout is generated
+    with a different seed and shifted tier weights -- so its base rate differs
+    and a model can be well calibrated on one prior and not the other. Report
+    both, and report the prior of each alongside, or the Brier skill score is
+    uninterpretable.
+    """
+    recs = load_jsonl(holdout_path)
+    key = find_label_field(recs)
+    y = np.array([to_binary(r[key]) for r in recs], dtype=int)
+    p = np.array([predict_p_win(r, model_path) for r in recs], dtype=float)
+
+    base = float(y.mean())
+    ref = base * (1.0 - base)          # Brier of the constant predictor p=base
+    brier = brier_score_loss(y, p)
+    ece, rows = expected_calibration_error(y, p)
+
+    print(f"\n-- HOLDOUT ({len(recs)} disputes, never seen in training) --")
+    print(f"base win rate      {base:.4f}")
+    print(f"reference Brier    {ref:.4f}   = base(1-base), the constant predictor")
+    print(f"AUC                {roc_auc_score(y, p):.3f}")
+    print(f"Brier              {brier:.4f}")
+    print(f"Brier skill        {1 - brier / ref:.3f}")
+    print(f"ECE                {ece:.4f}")
+    print(f"mean predicted p   {p.mean():.4f}  vs observed {base:.4f}  "
+          f"({p.mean() - base:+.4f})")
+    print(f"{'bin':>12} {'n':>5} {'pred':>7} {'actual':>7}")
+    for lo, hi, n, conf, freq in rows:
+        print(f"  {lo:.1f}-{hi:.1f} {n:5d} {conf:7.3f} {freq:7.3f}")
+    if chart_path:
+        reliability_plot(rows, chart_path, ece)
+    return dict(n=len(recs), base_rate=base, reference_brier=ref,
+                auc=float(roc_auc_score(y, p)), brier=float(brier),
+                skill=float(1 - brier / ref), ece=float(ece),
+                mean_predicted=float(p.mean()))
+
+
 _CACHE = None
 
 
@@ -178,5 +220,13 @@ if __name__ == "__main__":
     ap.add_argument("--out", default=DEFAULT_MODEL)
     ap.add_argument("--chart", default=os.path.join(HERE, "..", "data", "reliability.png"))
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--holdout", default=None,
+                    help="score calibration on this file instead of training")
+    ap.add_argument("--holdout-chart",
+                    default=os.path.join(HERE, "..", "data",
+                                         "reliability_holdout.png"))
     a = ap.parse_args()
-    train(a.train, a.out, a.chart, a.seed)
+    if a.holdout:
+        evaluate_holdout(a.holdout, a.out, a.holdout_chart)
+    else:
+        train(a.train, a.out, a.chart, a.seed)

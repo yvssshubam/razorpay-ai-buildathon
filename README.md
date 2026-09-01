@@ -26,6 +26,23 @@ The agent recovers **₹232,877 more than contesting everything** — 1.79× the
 return on the same 800 disputes — while submitting fewer packets (392 vs 484)
 and sending **one eighth** as many to a human (38 vs 316).
 
+**That gap is a sum over a heavy-tailed amount distribution, so it needs an
+interval, not a point.** Resampling the 800 disputes with replacement, 2,000
+times:
+
+```
+agent - contest_all    point   ₹232,877
+                      95% CI   ₹200,944  to  ₹265,592
+      draws where the gap <= 0        0 / 2,000
+```
+
+The obvious attack on a heavy-tailed headline is *what if the three largest
+disputes had gone the other way.* They can, and the sign does not move.
+
+```
+python eval/run_eval.py --data data/holdout.jsonl --bootstrap
+```
+
 **Where completeness and hallucination are measured.** The policy scorer in
 `eval/baselines.py` assembles packets deterministically rather than calling
 Stages 3 and 4, so those two metrics belong to the verifier section below, where
@@ -36,11 +53,38 @@ figure could be anything but 1.0 and 0.0 in this table.
 
 **Two precision numbers, deliberately.** *Winnable* precision asks whether we
 would have won. *EV* precision asks whether contesting was worth attempting at
-₹250 a go. They disagree, and the disagreement is the product thesis: a ₹450
-case we would win 80% of the time returns ₹306 in expected recovery against a
-₹250 cost — a miss under the first definition and a correct decline under the
-second. The agent scores 0.54 on the first and 0.93 on the second. It is not
-trying to win every dispute. It is trying to spend well.
+₹250 a go. They disagree, and the disagreement is the product thesis.
+
+The gap is not hypothetical, so here is a case from the holdout rather than an
+invented one. `D00187`, Mastercard 4837, ₹35,535, true win probability 0.18: it
+returns ₹5,431 in expected recovery against a ₹250 cost. Contesting it is
+correct, and it lost — as it should roughly four times in five. It counts
+against winnable precision and for EV precision, and both are right.
+
+That case is typical, not cherry-picked. The agent contested 430 disputes and
+lost 196 of them; **170 of those 196 losses — 87% — were positive-expected-value
+at the time of the decision.** The agent scores 0.54 winnable precision and 0.93
+EV precision, and the distance between those two numbers is almost entirely
+this. It is not trying to win every dispute. It is trying to spend well.
+
+### The cost of being wrong
+
+The track brief asks for this by name: rupees spent contesting losers, plus
+rupees forfeited by accepting winnable cases. It is a scorecard row, not a
+footnote, because the split between the two columns *is* the triage argument.
+
+| policy | paid to lose | left behind | total |
+|---|---:|---:|---:|
+| contest everything | ₹326,050 | ₹0 | ₹326,050 |
+| contest nothing | ₹0 | ₹697,677 | ₹697,677 |
+| **agent** | **₹72,200** | **₹77,417** | **₹149,617** |
+
+Contesting everything is wrong in exactly one direction and never leaves money
+behind, which is why it looks safe and costs ₹326,050. The agent is wrong in
+both directions and costs **46% of that**. It accepts some cases it would have
+won — ₹77,417 of them, and that column is the honest price of triage — and buys
+that with a 78% reduction in wasted contests. `left_behind` is net of the
+contest cost the attempt would have required.
 
 ### Where the money is, by difficulty tier
 
@@ -75,39 +119,130 @@ Hallucination is treated as a compliance failure, not a known limitation. A
 fabricated delivery timestamp in a representment packet is false evidence
 submitted to a card network, by a merchant the aggregator is responsible for.
 
-The verifier is a hard gate. To test it, faults are injected at a known rate and
-the measured rate compared:
+The verifier is a hard gate with five deterministic checks: the cited artifact
+exists, its kind matches what the claim asserts, it predates the dispute, the
+field value the claim copies matches the artifact's actual value, and the
+surviving claims still cover the reason code's documented requirement. The first
+four strip claims; the fifth blocks the packet.
 
-| injected fault rate | measured | packets blocked | mean completeness |
-|---:|---:|---:|---:|
-| 0.00 | 0.000 | 0.34 | 0.844 |
-| 0.05 | 0.049 | 0.48 | 0.800 |
-| 0.10 | 0.108 | 0.66 | 0.751 |
-| 0.20 | 0.197 | 0.78 | 0.674 |
-| 0.40 | 0.390 | 0.94 | 0.511 |
+**The fifth check exists because the first four were not enough, and the way
+that was found is worth reporting.** Checks 1–3 are all structural: they ask
+whether the citation points at a real, correctly typed, sufficiently old
+document. They say nothing about whether the claim's *content* matches that
+document's content. So the exact example quoted above — "delivered on 3 March",
+citing a real, correctly typed, correctly dated `delivery_confirmation` that
+actually records 11 March — passed every check. The failure mode the whole
+architecture is justified by was the one the gate did not enforce.
 
-Detection tracks injection across an eightfold range.
+The injector had the same blind spot. It generated bad artifact IDs and kind
+mismatches, so *detection tracking injection* only demonstrated that the
+verifier catches faults built to be catchable. That is E1's lesson a second
+time: a measurement that cannot fail is not a measurement.
 
-**On the real model.** `gemini-3.1-flash-lite` was run over the same 50
-disputes: **zero fabrications across 223 claims**, block rate 0.340, mean
-completeness 0.844. Those last two figures are identical to the mock's
-zero-fault row above, on the same disputes — so every block came from the
-evidence itself, not from how the mock constructs claims. Two independent runs
-agreeing is what makes the intercept below a property of the data rather than an
-artifact of the harness.
+Both were fixed together — claims are now `{artifact_id, asserts_kind,
+asserts_field, asserts_value}` triples checked against the record, and a fifth
+fault class corrupts a field value inside an otherwise perfect artifact.
+Re-running the curve with the harder injector, against both verifiers:
+
+| injected | four checks (old) | five checks (now) | blocked (now) | completeness |
+|---:|---:|---:|---:|---:|
+| 0.00 | 0.000 | 0.000 | 0.395 | 0.828 |
+| 0.05 | 0.036 | 0.051 | 0.535 | 0.784 |
+| 0.10 | 0.067 | 0.099 | 0.650 | 0.744 |
+| 0.20 | 0.131 | 0.194 | 0.807 | 0.663 |
+| 0.40 | 0.260 | 0.385 | 0.946 | 0.501 |
+
+*n = 800, mock provider, all disputes (`agent/verify.py`), so the blocked column
+is the contest-everything population. The agent-triaged equivalent is
+`eval/llm_packet_eval.py`, and its blocked column is lower throughout for the
+reason given below. The earlier version of this table was measured on the first
+50 disputes, `verify.py`'s default, and did not say so; it reproduces exactly at
+`python agent/verify.py data/holdout.jsonl 50`.*
+
+The old verifier now visibly undershoots — it detects about two thirds of what
+is injected, and the missing third is precisely the field-level class. The
+five-check verifier tracks injection across the same eightfold range. **No
+fabrication reached a submitted packet at any fault rate under either
+configuration**, because a stripped claim cannot satisfy the coverage check;
+what changed is how many faults are seen at all. `CB_FIELD_CHECK=off` restores
+the four-check behaviour so the two columns can be reproduced.
+
+A claim that names no checkable field is stripped as unverifiable rather than
+trusted, on the same logic: a gate cannot pass what it cannot check. That is
+counted separately from fabrication, because an unverifiable claim is a
+drafting-format failure and not a lie.
+
+**The zero-fault intercept did not move** — 0.395 before and after — which
+matters, because the intercept is the finding below and a new check that
+inflated it would have been buying the result.
+
+**On the real model.** `gemini-3.1-flash-lite`, over the first 50 disputes, run
+on both populations so the numbers are comparable to the mock rows above:
+
+```
+                       claims   halluc   value   unver   block   complete
+contest-everything        223    0.000   0.000   0.000   0.340      0.844
+agent-triaged (31)        149    0.000   0.000   0.000   0.129      0.948
+```
+
+Every column is **identical to the mock's zero-fault row on the same
+population**, including the exact claim count. A real model and a deterministic
+stub, sharing no code past the rulebook lookup, produce the same structure and
+the same zero. That is what makes the block rates below a property of the
+evidence rather than an artifact of how the mock builds claims.
+
+**`unver` is 0.000 across all 223 claims**, which is the load-bearing number.
+The drafting schema now demands that each claim name an artifact field and copy
+its value, and the model did so on every claim without exception. **`value` is
+also 0.000**: every copied value matched the record. So the zero-fabrication
+result is no longer only about references — the model invented neither an
+artifact nor a *value inside* one, which is the failure mode §4 exists to catch.
+
+Two honest limits on that. The artifact payloads are short scalars — a tracking
+ID, a day number — so copying them is an easy instruction to follow; the claim
+is that the model does not fabricate values it has been asked to copy, not that
+it never fabricates. And 50 disputes at one temperature is a small sample. The
+injected-fault curve, not this run, is what demonstrates the gate works when a
+model does fabricate.
 
 A zero fabrication rate does not make the gate redundant; it means this model
-did not test it. The injected-fault curve is what demonstrates the gate works
-when a model does fabricate. Both claims are needed and neither substitutes for
-the other.
+did not test it. Both claims are needed and neither substitutes for the other.
 
-**The intercept is the more interesting number.** At *zero* model error, about a
-third of packets still block — on evidence timestamped after the dispute, and on
-required documents that never existed at all. One holdout case (D00003, Visa
-13.1) blocks on a single missing item, `service_completion_records`, with no
-claim stripped and no model error anywhere in the chain. That share of the human
-queue is structural. No improvement in drafting removes it. **The bottleneck is
-evidence assembly, not generation.**
+**The intercept is the more interesting number, and it depends on which
+disputes you ask about.** At *zero* model error, **39.5% of all 800 disputes
+block** — on evidence timestamped after the dispute, and on required documents
+that never existed at all. Under the agent's triage the same floor is **8.8%**
+(38 of the 430 it contests). Both are correct and they are not the same
+measurement, so the harness reporting each says which:
+
+```
+python agent/verify.py data/holdout.jsonl 800              # 0.395, all disputes
+python eval/llm_packet_eval.py                             # 0.088, agent-triaged
+python eval/llm_packet_eval.py --policy contest_all        # 0.395, matches above
+```
+
+Those two floors, 38 and 316 packets, are exactly the escalation counts in the
+scorecard. That is a useful cross-check rather than a coincidence: the
+deterministic packet builder and the mock LLM path, which share no code past the
+rulebook lookup, agree to the packet at zero injected fault.
+
+The gap between them is a second-order result worth stating outright. **Triage
+cuts the structural block floor by 78% without touching the verifier**, because
+the disputes whose evidence never existed are disproportionately the ones not
+worth contesting anyway. The evidence gap and the EV signal are correlated in
+the data, and declining on expected value quietly declines most of the
+unwinnable-on-paperwork cases too.
+
+One holdout case (D00003, Visa 13.1) blocks on a single missing item,
+`service_completion_records`, with no claim stripped and no model error anywhere
+in the chain. That share of the human queue is structural. No improvement in
+drafting removes it. **The bottleneck is evidence assembly, not generation.**
+
+A note on reading the `struct` column at non-zero fault rates: it falls from
+0.088 to 0.037 as injection rises, which is attribution, not improvement. A
+packet blocked on both an unreachable kind *and* a kind the drafter lost is
+attributed to the model, so structural blocks get reclassified rather than
+disappearing. The floor is only readable at fault rate zero.
 
 ### Robustness: the constants were chosen, not measured
 
@@ -131,6 +266,30 @@ does, and its worst value anywhere is ₹265,658.
 The mechanism is simple. The agent escalates 38 packets; contest-all escalates
 316. Where the true cost of human review is unknown — and it is — that
 difference in exposure is itself the argument.
+
+**Two objections to answer before they are raised.**
+
+*The first is that the defaults look cherry-picked.* The shipped human resolve
+rate, 0.80, sits at the top of its swept range, which reads like quoting the
+headline from the favourable end. Check the direction: the agent's lead over
+contest-all is ₹304,752 at a resolve rate of 0.2 and ₹232,877 at 0.8. The
+**margin is narrowest at the default**, because a generous resolve rate helps
+the policy escalating 316 packets far more than the one escalating 38. Every
+untested value below the default widens the gap. Contest cost runs the other
+way — the margin grows from ₹192,327 at ₹100 to ₹562,562 at ₹900, so ₹250 sits
+in the lower third, and only an implausibly cheap ₹100 contest produces a
+narrower margin than the shipped figure.
+
+*The second is the one actually worth worrying about, so here it is stated
+plainly.* The result is most exposed to **human review being cheap**. At ₹300 a
+review the margin falls to **₹98,179** — the narrowest figure anywhere in the
+sweep, 58% below the headline. The mechanism is direct: the agent's advantage is
+substantially an escalation-exposure advantage, 38 packets against 316, and if a
+human costs almost nothing then contest-all's queue costs almost nothing either.
+The agent still wins, and it still wins at every value tested. But a reviewer who
+believes chargeback review is cheap labour should be shown ₹98,179 rather than
+₹232,877, and the honest version of the claim is that the *sign* is robust
+across every constant while the *size* is not.
 
 A fifth constant, the ₹1,500 median order value, is **not** swept: varying it
 requires regenerating the datasets and retraining rather than rescoring. It is
@@ -166,6 +325,35 @@ real amounts, with the escalation branch still mispriced, it appeared to *gain*
 ₹10,250 at a floor of 0.20 — a gain that did not replicate on a second dataset,
 and that vanished entirely once the escalation cost was corrected (§3). The
 floor was compensating for an accounting error, not adding anything.
+
+**The floor peaks at 0.00, which is the bottom of its own swept range, and a
+maximum sitting on a boundary is not a demonstrated maximum.** So the
+accept/contest boundary itself is swept in both directions — contest if
+`ev > T`, with T from −₹300 to +₹300. Negative T contests marginally EV-negative
+cases; positive T demands a margin.
+
+```
+   T      net rupees   sub/acc/esc
+-300         525,050   484/264/52
+-200         526,619   479/274/47
+-100         534,286   445/314/41   <- highest
+   0         526,279   392/370/38   <- shipped
++100         528,063   334/434/32
++200         519,051   297/473/30
++300         505,840   266/508/26
+```
+
+The optimum is interior rather than on a boundary, which is what the sweep was
+for. But **it is not a real gain and it is not being claimed as one.** The
+₹8,007 improvement at T = −₹100 has a bootstrap 95% CI of [−₹1,493, ₹19,010],
+with 107 of 2,000 resamples at or below zero. The curve is flat to within ±1.7%
+across a ₹400 band. The defensible statement is the weaker one: *the boundary at
+zero cannot be improved on at 95% confidence, and the policy is not
+systematically mistuned in either direction.* T stays at zero.
+
+```
+python eval/run_eval.py --data data/holdout.jsonl --ev-sweep
+```
 
 ---
 
@@ -218,22 +406,48 @@ not decide anything.
 
 ### Model quality
 
-Trained on 3,000 disputes, evaluated on an internal split (not the holdout):
+Trained on 3,000 disputes. Reported twice: on an internal 25% split of the
+training file, which is the number used for model selection, and on the 800-row
+holdout, which is the number that licenses the EV rule.
 
 ```
-AUC    0.800
-Brier  0.1760   (base-rate Brier 0.2458 -> skill score 0.284)
-ECE    0.0285
+                          internal split      holdout (800)
+base win rate                    0.4347             0.3937
+reference Brier  b(1-b)          0.2458             0.2387
+AUC                               0.800              0.803
+Brier                            0.1760             0.1744
+Brier skill                       0.284              0.269
+ECE                              0.0285             0.0337
+mean predicted p(win)                --             0.4227  (observed 0.3937)
+```
+
+**Read the reference-Brier row carefully.** `0.2458` is not a base rate; it is
+`b(1−b)` at a base rate of `0.4347`, which is the Brier score of the constant
+predictor. The skill score divides by that, not by `b`. This is spelled out
+because dividing by the base rate itself instead is an easy misreading and
+produces `0.051`, a number this project does not claim.
+
+The holdout is generated with a different seed and shifted tier weights, so its
+prior is 4.1 points lower than training. The model carries the training prior
+across: mean predicted p(win) is `0.4227` against an observed `0.3937`, so it is
+mildly **over**-confident on the holdout, and every reliability bin above 0.1
+predicts at or above the observed rate. Direction matters — over-confidence
+under an EV rule means contesting slightly too much, not too little.
+`data/reliability.png` (internal), `data/reliability_holdout.png` (holdout).
+
+```
+python agent/classifier.py --holdout data/holdout.jsonl
 ```
 
 Calibration matters more than ranking here, because the EV rule multiplies
 p(win) by rupees. A model that says 0.9 when it is right 0.6 of the time
-overspends systematically, and AUC will not catch it. `data/reliability.png`.
+overspends systematically, and AUC will not catch it.
 
-Two honest notes. The model is mildly overconfident in the 0.6–0.7 band
-(predicted 0.638, observed 0.548) on 31 samples, and mildly underconfident from
-0.7 to 0.9. Neither is worth correcting; both are within what 3,000 rows
-supports.
+Two honest notes. On the internal split the model is mildly overconfident in the
+0.6–0.7 band (predicted 0.638, observed 0.548) on 31 samples, and mildly
+underconfident from 0.7 to 0.9. Neither is worth correcting; both are within
+what 3,000 rows supports. Ranking transfers to the holdout intact (AUC 0.803);
+the small calibration cost there is the prior shift, not overfitting.
 
 **A finding worth stating plainly: better data made a better model, not better
 tuning.** AUC rose from 0.783 to 0.800 and ECE fell from 0.067 to 0.0285 purely
@@ -365,21 +579,33 @@ not a claim about what the networks mandate.
 
 **The real-model hallucination measurement is one model on one dataset.**
 `gemini-3.1-flash-lite` produced zero fabrications across 223 claims on 50
-disputes (§1). That bounds the rate below roughly 1.3%, but it is a single model
-on a single generated dataset, and the constrained retrieval is doing real work
-— the model cannot cite an artifact it was never shown. A zero here means the
-verifier was *untested* by this model, not that it is unnecessary; that is
-exactly what the fault-injection curve is for.
+disputes (§1). By the rule of three that bounds the rate below roughly 1.3%, but
+it is a single model on a single generated dataset at one temperature.
+
+Two halves of that zero deserve different amounts of credit. The
+**reference-level** zero — no invented artifact IDs, no upgraded kinds — is
+substantially explained by the constrained retrieval: the model cannot cite an
+artifact it was never shown, so the architecture is doing work the model is not.
+The **value-level** zero is not explained that way. Nothing in retrieval stops a
+model from misstating a figure inside an artifact it *was* shown, which is
+precisely why check 4 exists. That half is a result about the model rather than
+about the harness, and it is the half worth quoting.
+
+A zero here still means the verifier was *untested* by this model, not that it
+is unnecessary; that is exactly what the fault-injection curve is for.
 
 **Training and holdout amounts come from the same sampling pool.** Other
 parameters differ between the two sets by design; amounts do not, because both
 are samples from the same real distribution.
 
-### Four errors found and corrected during the build
+### Seven errors found and corrected during the build
 
 All are in the git history rather than quietly fixed, because how a system fails
-is part of what it is. Three of the four produced a *plausible number* rather
-than a crash, which is the expensive kind.
+is part of what it is. Most produced a *plausible number* rather than a crash,
+which is the expensive kind. The last three were found by auditing the finished
+system rather than while building it, and two of those are errors in the
+*reporting* rather than the code — a wrong sentence and an overstated fix — which
+is a category worth naming, because no test suite covers it.
 
 **The rulebook was wrong.** v1 was transcribed from memory: RZP01 was modelled
 as a duplicate-charge code when it is goods-not-provided, Visa 13.1 required an
@@ -410,9 +636,49 @@ cleared ₹1,000; the scorer only profited above ₹1,312.50. Every case in that
 was escalated by the policy and booked as a loss by the metric — the same
 decision-versus-scoring drift as the cost sweep bug, one layer down. Correcting
 it moved the headline from ₹529,555 to ₹526,279, cut the human queue from 50 to
-38, and removed a spurious ₹10,250 result from the floor sweep. The escalation
-cost now has a single definition in `metrics.escalation_cost` which both paths
-import.
+38, and removed a spurious ₹10,250 result from the floor sweep.
+
+**And the fix for that was reported as more complete than it was.** The commit
+message and this README both said the escalation cost now had a single
+definition in `metrics.escalation_cost()` that every path imported. Two of the
+three did. `eval/baselines.py` — the decision rule itself, the path the bug had
+been in — was still adding `contest_cost + HUMAN_REVIEW_COST` by hand, four
+lines below a docstring in `metrics.py` explicitly forbidding exactly that. The
+two expressions were numerically identical, so nothing was wrong with any
+reported figure and nothing would have surfaced in a test. The tell was only
+visible by grepping for the constants rather than for the function name. This is
+the residue of E3 rather than a new bug, and it is the reason it is worth
+writing down: **a fix that removes the symptom and leaves the mechanism in place
+reads, in a commit log, exactly like a fix that removed both.** The decision path
+now imports it.
+
+**The flagship worked example was arithmetically wrong.** The paragraph
+introducing the two precision definitions used "a ₹450 case we would win 80% of
+the time returns ₹306 against a ₹250 cost" as an example of a *correct decline*.
+It is not one: ₹306 − ₹250 = +₹56, so the rule contests it. The example also
+illustrated recall while sitting in a paragraph about precision. Nothing in the
+code was affected — no metric reads that sentence — which is precisely why it
+survived several rounds of checking the code. It now uses a real holdout case
+(D00187) with the arithmetic taken from the file rather than composed by hand,
+and `metrics.py` records the boundary that any future example has to clear: at
+p = 0.8 a case must be under ₹368 to be a correct decline.
+
+**The verifier and its own test shared a blind spot.** Checks 1–3 were all
+structural — real ID, right kind, old enough — and none compared a claim's
+content against the artifact's content. So a claim asserting a delivery date the
+document does not contain passed every check, while citing a genuine, correctly
+typed, correctly dated document. That is the exact scenario quoted at the top of
+§1 to justify the architecture. The fault injector had the same gap in the same
+place: it generated bad IDs and kind mismatches, so "detection tracks injection"
+demonstrated only that the verifier catches faults built to be catchable. E1's
+lesson, arriving a second time on a different subject: a measurement that cannot
+fail is not a measurement. Both were fixed together — claims became
+`{artifact_id, asserts_kind, asserts_field, asserts_value}` triples with a fifth
+check, and the injector gained a fault class that corrupts a field value inside
+an otherwise perfect artifact. Against the harder injector the old verifier
+detects about two thirds of what is injected; the new one tracks it. The
+zero-fault intercept did not move, which is what says the new check did not
+simply buy the headline result by blocking more.
 
 **The amount distribution was too smooth.** Fitting a log-normal gave a
 p99/median of 8.71 when the real data has 15.28. Real transactions have a

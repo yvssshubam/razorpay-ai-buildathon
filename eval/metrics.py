@@ -5,8 +5,17 @@ TWO DEFINITIONS OF "SHOULD HAVE CONTESTED"
 `_winnable`  : we would have won it. Pure winnability.
 `_ev`        : contesting it had positive expected value at this contest cost.
 
-These disagree, and the disagreement is the product thesis. A Rs 450 case we'd
-win 80% of the time is a MISS under _winnable and a CORRECT DECLINE under _ev.
+These disagree, and the disagreement is the product thesis. Holdout case D00187:
+Rs 35,535 at a true win probability of 0.18 returns Rs 5,431 expected against a
+Rs 250 cost. Contesting is correct and it loses roughly four times in five, so
+it is a MISS under _winnable and a HIT under _ev. Both are right. 170 of the
+agent's 196 contested losses are of this shape.
+
+The declines run the other way and are bounded by the arithmetic: at p = 0.8 a
+case must be under Rs 368 to be a correct decline (0.8 * A * 0.85 > 250 gives
+A > 367.6). Any worked example above that amount contests -- check the sign
+before writing one down.
+
 Report both. The gap between them is the money triage saves.
 
 THREE-STATE OUTCOMES

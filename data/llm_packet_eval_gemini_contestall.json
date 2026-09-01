@@ -1,0 +1,28 @@
+[
+ {
+  "policy": "contest_all",
+  "n_disputes": 50,
+  "n_claims": 223,
+  "fabricated": 0,
+  "kind_errors": 0,
+  "stale": 15,
+  "value_errors": 0,
+  "unverifiable": 0,
+  "blocked": 17,
+  "blocked_structural": 17,
+  "blocked_model": 0,
+  "draft_errors": 0,
+  "submitted_clean": 33,
+  "hallucination_rate": 0.0,
+  "stale_rate": 0.0673,
+  "value_error_rate": 0.0,
+  "unverifiable_rate": 0.0,
+  "block_rate": 0.34,
+  "structural_block_rate": 0.34,
+  "model_block_rate": 0.0,
+  "mean_completeness": 0.844,
+  "fabrications_submitted": 0,
+  "fault_rate": 0.0,
+  "provider": "GeminiProvider"
+ }
+]

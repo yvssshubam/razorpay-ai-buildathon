@@ -18,6 +18,7 @@ rule over observable features, no trained model. The classifier replaces
 `_estimate_p_win` on day 5; nothing else changes.
 """
 import distributions_ref as dist
+import metrics
 import os, sys
 SUBMITTED = "submitted"
 ACCEPTED = "accepted"
@@ -123,10 +124,13 @@ def agent(dispute, contest_cost=None):
 
     The packet is built before the decision, not after, because _build_packet is
     deterministic and independent of the choice. A case whose packet will be
-    blocked does not cost CONTEST_COST -- it costs HUMAN_REVIEW_COST and only
-    pays out on the fraction a human can resolve. Pricing every contest at
-    CONTEST_COST systematically overspends on exactly the cases least able to
-    repay it.
+    blocked does not cost CONTEST_COST alone -- the packet is assembled and
+    THEN a person picks it up, so it costs metrics.escalation_cost(), which is
+    CONTEST_COST + HUMAN_REVIEW_COST, and it only pays out on the fraction a
+    human can resolve. Pricing every contest at CONTEST_COST systematically
+    overspends on exactly the cases least able to repay it. That sum lives in
+    metrics.escalation_cost() and is imported, never re-added here: this
+    function held the last hand-written copy of it, which is how E3 happened.
 
     CB_P_FLOOR sets a hard confidence floor beneath the EV test: never contest
     below this p(win) whatever the amount. Blunt instrument, swept in eval.
@@ -143,11 +147,16 @@ def agent(dispute, contest_cost=None):
     gross = p * dispute["amount"] * dist.NET_RECOVERY_FRACTION
 
     if blocked:
-        ev = gross * dist.HUMAN_RESOLVE_RATE - (cc + dist.HUMAN_REVIEW_COST)
+        ev = gross * dist.HUMAN_RESOLVE_RATE - metrics.escalation_cost(cc)
     else:
         ev = gross - cc
 
-    if ev <= 0:
+    # CB_EV_THRESHOLD shifts the accept/contest boundary off zero, in rupees.
+    # Negative accepts marginally EV-negative cases (useful if the model is
+    # under-confident); positive demands a margin (useful if over-confident).
+    # Swept two-sided in run_eval.py --ev-sweep; default 0 changes nothing.
+    thr = float(os.environ.get("CB_EV_THRESHOLD", 0.0))
+    if ev <= thr:
         return _decision(ACCEPTED, p_win=round(p, 3))
     return _decision(ESCALATED if blocked else SUBMITTED,
                      packet, claims, round(p, 3))

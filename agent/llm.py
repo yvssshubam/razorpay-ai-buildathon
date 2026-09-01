@@ -93,18 +93,39 @@ class MockProvider:
             if not a.get("present"):
                 continue
             if rng.random() < self.fault_rate:
-                mode = rng.choice(["bad_id", "bad_fact"])
+                mode = rng.choice(["bad_id", "bad_fact", "bad_value"])
                 if mode == "bad_id":
                     claims.append({
                         "text": f"A {a['kind']} record confirms the transaction.",
                         "artifact_id": f"{aid}_X",
                         "asserts_kind": a["kind"],
+                        "asserts_field": "value",
+                        "asserts_value": a.get("value"),
                     })
-                else:
+                elif mode == "bad_fact":
                     claims.append({
                         "text": f"The {a['kind']} record was signed by the cardholder.",
                         "artifact_id": aid,
                         "asserts_kind": "signed_delivery_confirmation",
+                        "asserts_field": "value",
+                        "asserts_value": a.get("value"),
+                    })
+                else:
+                    # THE FIFTH FAULT CLASS, added after audit. Real ID, right
+                    # kind, right date -- and a fabricated field value. This is
+                    # the fabricated-delivery-timestamp case that motivates the
+                    # whole architecture, and it passed every structural check
+                    # before check 4 existed. The injector deliberately
+                    # generates a fault the pre-audit verifier could not catch;
+                    # an injector that only produces catchable faults measures
+                    # nothing (E1's lesson).
+                    claims.append({
+                        "text": f"The {a['kind']} record was created on day "
+                                f"{a.get('created_day', 0) - 3}.",
+                        "artifact_id": aid,
+                        "asserts_kind": a["kind"],
+                        "asserts_field": "created_day",
+                        "asserts_value": str(a.get("created_day", 0) - 3),
                     })
             else:
                 claims.append({
@@ -112,6 +133,8 @@ class MockProvider:
                             f"supports this representment.",
                     "artifact_id": aid,
                     "asserts_kind": a["kind"],
+                    "asserts_field": "created_day",
+                    "asserts_value": str(a.get("created_day")),
                 })
         return json.dumps({"claims": claims})
 

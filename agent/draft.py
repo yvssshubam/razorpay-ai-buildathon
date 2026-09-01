@@ -24,10 +24,18 @@ Rules, without exception:
 - artifact_id MUST be copied exactly from the artifacts object.
 - asserts_kind MUST be that artifact's own kind. Never upgrade a kind, for
   example never describe a photo_delivery_confirmation as a signed one.
+- Every claim MUST also name ONE field of that artifact it relies on
+  (asserts_field, one of: value, created_day, api_field, kind) and copy that
+  field's exact content into asserts_value. Copy it; do not restate, reformat
+  or summarise it. A claim whose asserts_value does not match the artifact is
+  discarded and may block the whole packet.
+- The prose in "text" must not assert any date, amount or identifier that is
+  not the field you copied.
 - If an artifact does not support a claim, omit it rather than stretching it.
 
 Return JSON only, no prose, no markdown fences:
-{"claims":[{"text":"...","artifact_id":"...","asserts_kind":"..."}]}"""
+{"claims":[{"text":"...","artifact_id":"...","asserts_kind":"...",
+            "asserts_field":"...","asserts_value":"..."}]}"""
 
 
 def build_context(dispute, retrieved):
@@ -80,11 +88,19 @@ def draft_claims(dispute, provider=None, seed=0):
     clean = []
     for c in claims:
         if isinstance(c, dict) and c.get("artifact_id"):
-            clean.append({
+            row = {
                 "text": str(c.get("text", ""))[:400],
                 "artifact_id": str(c["artifact_id"]),
                 "asserts_kind": str(c.get("asserts_kind", "")),
-            })
+            }
+            # Carried through only when the model supplied BOTH halves. A
+            # half-formed triple is left absent rather than repaired here, so
+            # the verifier sees the drafting failure instead of a patched-up
+            # claim that looks checkable and is not.
+            if c.get("asserts_field") and c.get("asserts_value") is not None:
+                row["asserts_field"] = str(c["asserts_field"])
+                row["asserts_value"] = str(c["asserts_value"])
+            clean.append(row)
     return clean, None
 
 

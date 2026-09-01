@@ -1,14 +1,15 @@
 """Stage 4: the verifier. A hard gate, not a filter.
 
-Four checks, cheapest first. Every one is deterministic -- no model verifies
+Five checks, cheapest first. Every one is deterministic -- no model verifies
 another model's output, because that just moves the trust problem.
 
   1. exists      the cited artifact_id is in the retrieved set
   2. kind        asserts_kind matches the artifact's actual kind
   3. temporal    the artifact predates the dispute
-  4. required    after stripping, the surviving kinds still cover the rulebook
+  4. value       asserts_value equals the artifact's actual field value
+  5. required    after stripping, the surviving kinds still cover the rulebook
 
-Checks 1-3 strip individual claims. Check 4 blocks the whole packet and routes
+Checks 1-4 strip individual claims. Check 5 blocks the whole packet and routes
 it to a human. That distinction is the point: a packet with a bad claim removed
 may still be submittable; a packet that no longer meets the reason code's
 documented requirement must not be.
@@ -17,6 +18,22 @@ WHY THIS IS A GATE. A fabricated delivery timestamp in a representment is not a
 quality bug. It is false evidence submitted to a card network by a merchant the
 aggregator is responsible for. Post-hoc filtering leaves a window where the
 false claim is submittable. A gate does not.
+
+WHY CHECK 4 EXISTS (added after audit). Checks 1-3 are all STRUCTURAL: they ask
+whether the citation points at a real, correctly typed, sufficiently old
+document. They say nothing about whether the claim's content matches that
+document's content. So the exact failure mode quoted above -- "delivered on 3
+March" citing a real, correctly typed, correctly dated delivery_confirmation
+that actually records 11 March -- passed all four of the original checks. The
+most dangerous fault is not a kind mismatch. It is a field-level fabrication
+inside a correctly typed, correctly dated, genuinely existing document, because
+every structural check passes and the packet looks perfect.
+
+A claim that asserts no checkable field is not silently trusted. It is stripped
+as UNVERIFIABLE, under the same logic: a gate cannot pass what it cannot check.
+That is counted separately from fabrication -- an unverifiable claim is a
+drafting-format failure, not a lie. CB_FIELD_CHECK=off restores the pre-audit
+four-check behaviour, which exists only so the two can be compared.
 """
 import os
 import sys
@@ -25,15 +42,50 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from draft import retrieve
 
 EXISTS, KIND, TEMPORAL = "no_such_artifact", "kind_mismatch", "stale_artifact"
+VALUE, UNVERIFIABLE = "value_mismatch", "unverifiable_claim"
+
+# Artifact fields a claim is allowed to assert against. Restricted on purpose:
+# a claim may not assert against 'present' (a pipeline flag, not evidence) or
+# against a field the artifact does not carry.
+CHECKABLE_FIELDS = ("value", "created_day", "api_field", "kind")
+
+
+def _field_check(claim, art):
+    """Returns (reason, detail) if the claim fails check 4, else (None, None).
+
+    Comparison is on the string form. The artifact payloads are scalars, and a
+    loose comparison here would reintroduce exactly the ambiguity the check
+    exists to remove.
+    """
+    if os.environ.get("CB_FIELD_CHECK", "on").lower() == "off":
+        return None, None
+
+    field = claim.get("asserts_field")
+    if not field or "asserts_value" not in claim:
+        return UNVERIFIABLE, None
+    if field not in CHECKABLE_FIELDS:
+        return UNVERIFIABLE, f"unknown field {field}"
+    asserted = str(claim.get("asserts_value")).strip()
+    if not asserted:
+        # An empty value is the same failure as supplying none: the model gave
+        # the gate nothing to check. Counting it as a fabrication would inflate
+        # the headline number with a formatting fault, which is the thing this
+        # file is careful not to do everywhere else.
+        return UNVERIFIABLE, "empty value"
+    if str(art.get(field)) != asserted:
+        return VALUE, str(art.get(field))
+    return None, None
 
 
 def verify(dispute, claims):
     """Returns a dict: kept claims, stripped claims with reasons, blocked flag.
 
-    hallucination_rate here counts EXISTS and KIND strips only. A stale artifact
-    is a real record cited about the wrong period -- a grounding error, not a
-    fabrication. Folding the two together would inflate the headline number and
-    hide which failure mode the model actually has.
+    hallucination_rate counts EXISTS, KIND and VALUE strips. All three are the
+    model asserting something the source records do not contain. A stale
+    artifact is a real record cited about the wrong period -- a grounding error,
+    not a fabrication -- and an unverifiable claim asserts nothing checkable at
+    all. Folding those two in would inflate the headline number and hide which
+    failure mode the model actually has.
     """
     retrieved = retrieve(dispute)
     dispute_day = dispute.get("dispute_day", 0)
@@ -53,6 +105,13 @@ def verify(dispute, claims):
         if art.get("created_day", 0) >= dispute_day:
             stripped.append({**c, "reason": TEMPORAL})
             continue
+        reason, detail = _field_check(c, art)
+        if reason:
+            row = {**c, "reason": reason}
+            if detail is not None:
+                row["actual_value"] = detail
+            stripped.append(row)
+            continue
         kept.append({**c, "verified_kind": art.get("kind")})
 
     required = set(dispute.get("required_evidence") or [])
@@ -60,7 +119,7 @@ def verify(dispute, claims):
     missing = sorted(required - covered)
 
     n = len(claims)
-    fabricated = sum(1 for s in stripped if s["reason"] in (EXISTS, KIND))
+    fabricated = sum(1 for s in stripped if s["reason"] in (EXISTS, KIND, VALUE))
 
     return {
         "kept": kept,
@@ -70,6 +129,8 @@ def verify(dispute, claims):
         "n_claims": n,
         "n_stripped": len(stripped),
         "n_fabricated": fabricated,
+        "n_value_mismatch": sum(1 for s in stripped if s["reason"] == VALUE),
+        "n_unverifiable": sum(1 for s in stripped if s["reason"] == UNVERIFIABLE),
         "hallucination_rate": fabricated / n if n else 0.0,
         "completeness": (len(required & covered) / len(required)) if required else 1.0,
     }

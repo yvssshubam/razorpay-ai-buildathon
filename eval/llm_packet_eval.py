@@ -83,6 +83,7 @@ def run(disputes, provider, policy_name="agent"):
         "policy": policy_name,
         "n_disputes": 0, "n_claims": 0,
         "fabricated": 0, "kind_errors": 0, "stale": 0,
+        "value_errors": 0, "unverifiable": 0,
         "blocked": 0, "blocked_structural": 0, "blocked_model": 0,
         "completeness_sum": 0.0,
         "draft_errors": 0,
@@ -111,6 +112,8 @@ def run(disputes, provider, policy_name="agent"):
         agg["fabricated"] += r["n_fabricated"]
         agg["kind_errors"] += sum(1 for s in r["stripped"] if s["reason"] == KIND)
         agg["stale"] += sum(1 for s in r["stripped"] if s["reason"] == TEMPORAL)
+        agg["value_errors"] += r.get("n_value_mismatch", 0)
+        agg["unverifiable"] += r.get("n_unverifiable", 0)
         agg["completeness_sum"] += r["completeness"]
         if r["blocked"]:
             agg["blocked"] += 1
@@ -133,6 +136,8 @@ def run(disputes, provider, policy_name="agent"):
     agg.update({
         "hallucination_rate": round(agg["fabricated"] / c, 4),
         "stale_rate": round(agg["stale"] / c, 4),
+        "value_error_rate": round(agg["value_errors"] / c, 4),
+        "unverifiable_rate": round(agg["unverifiable"] / c, 4),
         "block_rate": round(agg["blocked"] / n, 4),
         "structural_block_rate": round(agg["blocked_structural"] / n, 4),
         "model_block_rate": round(agg["blocked_model"] / n, 4),
@@ -171,7 +176,7 @@ def main():
     results = []
 
     print(f"provider={provider_name}  policy={a.policy}  n={len(disputes)}\n")
-    hdr = (f"{'fault':>6} {'claims':>7} {'halluc':>8} {'stale':>7} "
+    hdr = (f"{'fault':>6} {'claims':>7} {'halluc':>8} {'value':>7} {'unver':>7} {'stale':>7} "
            f"{'block':>7} {'struct':>7} {'model':>7} {'complete':>9} {'shipped':>8}")
     print(hdr)
     print("-" * len(hdr))
@@ -187,6 +192,7 @@ def main():
         agg["provider"] = type(provider).__name__
         results.append(agg)
         print(f"{rate:>6.2f} {agg['n_claims']:>7} {agg['hallucination_rate']:>8.3f} "
+              f"{agg['value_error_rate']:>7.3f} {agg['unverifiable_rate']:>7.3f} "
               f"{agg['stale_rate']:>7.3f} {agg['block_rate']:>7.3f} "
               f"{agg['structural_block_rate']:>7.3f} {agg['model_block_rate']:>7.3f} "
               f"{agg['mean_completeness']:>9.3f} {agg['fabrications_submitted']:>8}")

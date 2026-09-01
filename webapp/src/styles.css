@@ -427,3 +427,141 @@ a { color: var(--accent); }
 .stack > * + * { margin-top: 12px; }
 .inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .spacer { flex: 1; }
+/* ==========================================================================
+   Append to webapp/src/styles.css (or wherever .card, .tbl and .badge live).
+   Nothing here overrides an existing rule; it only adds what the new
+   components in ui.tsx need.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Loading skeletons
+   Content appearing without a placeholder makes the page jump, which is most
+   of what reads as "choppy". These hold the space at roughly the right size.
+   -------------------------------------------------------------------------- */
+.skel {
+  display: block;
+  border-radius: 3px;
+  background: linear-gradient(90deg,
+    var(--line, #E6E8EC) 25%,
+    var(--bg, #F6F7F9) 37%,
+    var(--line, #E6E8EC) 63%);
+  background-size: 400% 100%;
+  animation: skel 1.3s ease-in-out infinite;
+}
+@keyframes skel { 0% { background-position: 100% 50% } 100% { background-position: 0 50% } }
+
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; background: var(--line, #E6E8EC); }
+}
+
+/* --------------------------------------------------------------------------
+   Sortable table headers
+   -------------------------------------------------------------------------- */
+.th-sort {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  color: inherit;
+  font: inherit;
+  padding: 2px 0;
+}
+.th-sort[data-align="right"] { flex-direction: row-reverse; }
+.th-sort:hover { color: var(--ink-1, #101828); }
+.th-sort[data-on="1"] { color: var(--ink-1, #101828); font-weight: 600; }
+.th-sort:focus-visible {
+  outline: 2px solid var(--primary, #4F46E5);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+/* Reserve the arrow's width always, so switching columns does not nudge the
+   header text sideways. */
+.th-ico {
+  display: inline-flex;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+}
+
+/* --------------------------------------------------------------------------
+   Sticky table header
+   A long queue that scrolls its own column labels off screen forces people to
+   scroll back up to remember which column is which.
+   -------------------------------------------------------------------------- */
+.tbl-wrap { max-height: 68vh; overflow: auto; }
+.tbl thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--card, #FFF);
+  box-shadow: inset 0 -1px 0 var(--line, #E6E8EC);
+}
+
+/* --------------------------------------------------------------------------
+   Rows are links: they need a focus ring and a real hover, not just a cursor
+   -------------------------------------------------------------------------- */
+.tbl tbody tr[data-click="1"] { cursor: pointer; }
+.tbl tbody tr[data-click="1"]:hover { background: var(--bg, #F6F7F9); }
+.tbl tbody tr[data-click="1"]:focus-visible {
+  outline: 2px solid var(--primary, #4F46E5);
+  outline-offset: -2px;
+}
+
+/* Truncation that keeps its tooltip */
+.clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Search clear button
+   -------------------------------------------------------------------------- */
+.field-clear {
+  all: unset;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--ink-4, #98A2B3);
+}
+.field-clear:hover { color: var(--ink-1, #101828); background: var(--line, #E6E8EC); }
+.field-clear:focus-visible {
+  outline: 2px solid var(--primary, #4F46E5);
+  outline-offset: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   Empty state
+   -------------------------------------------------------------------------- */
+.empty { text-align: center; padding: 46px 24px; }
+.empty-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg, #F6F7F9);
+  color: var(--ink-4, #98A2B3);
+  margin-bottom: 12px;
+}
+.empty .sub { max-width: 44ch; margin-left: auto; margin-right: auto; }
+
+/* --------------------------------------------------------------------------
+   Tabs: keep the count chip from shifting the label as numbers change width
+   -------------------------------------------------------------------------- */
+.tab .c { min-width: 1.6em; display: inline-block; text-align: center; }
+.tab:focus-visible {
+  outline: 2px solid var(--primary, #4F46E5);
+  outline-offset: -2px;
+}

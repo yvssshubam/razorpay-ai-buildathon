@@ -22,7 +22,6 @@ NUMERIC = [
     "n_missing",
     "n_artifacts",
     "frac_stale",
-    "dispute_age_days",
     "prior_disputes",
     "address_match",
     "new_device",
@@ -59,7 +58,6 @@ def base_features(d):
     pres = set(d.get("present_evidence") or [])
     arts = _artifacts(d)
     dday = d.get("dispute_day", 0)
-    txn_day = d.get("transaction_day", d.get("txn_day", dday))
 
     n_art = len(arts)
     stale = sum(1 for a in arts.values()
@@ -75,7 +73,6 @@ def base_features(d):
         "n_missing": float(len(req - pres)),
         "n_artifacts": float(n_art),
         "frac_stale": stale / max(n_art, 1),
-        "dispute_age_days": float(dday - txn_day),
         "prior_disputes": float(d.get("prior_disputes") or 0),
         "address_match": 1.0 if d.get("address_match") else 0.0,
         "new_device": 1.0 if d.get("new_device") else 0.0,

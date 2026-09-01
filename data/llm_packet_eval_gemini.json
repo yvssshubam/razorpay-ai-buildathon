@@ -1,0 +1,28 @@
+[
+ {
+  "policy": "agent",
+  "n_disputes": 31,
+  "n_claims": 149,
+  "fabricated": 0,
+  "kind_errors": 0,
+  "stale": 5,
+  "value_errors": 0,
+  "unverifiable": 0,
+  "blocked": 4,
+  "blocked_structural": 4,
+  "blocked_model": 0,
+  "draft_errors": 0,
+  "submitted_clean": 27,
+  "hallucination_rate": 0.0,
+  "stale_rate": 0.0336,
+  "value_error_rate": 0.0,
+  "unverifiable_rate": 0.0,
+  "block_rate": 0.129,
+  "structural_block_rate": 0.129,
+  "model_block_rate": 0.0,
+  "mean_completeness": 0.9484,
+  "fabrications_submitted": 0,
+  "fault_rate": 0.0,
+  "provider": "GeminiProvider"
+ }
+]
