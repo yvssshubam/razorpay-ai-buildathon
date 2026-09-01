@@ -295,6 +295,23 @@ timestamped after the dispute or never existed, and that no drafting
 improvement removes it. The merchant is the only party who can. So the
 dashboard asks. Optionally, once, without nagging.
 
+**What the system is doing there is deciding what information is worth
+acquiring.** For every missing document, `serve/evidence.py::opportunities()`
+injects a probe record, re-scores the dispute through the same classifier and
+the same EV rule, and prices that document by the expected value it would
+unlock. Each is priced alone rather than cumulatively, because two documents
+that block the same packet are worth their joint effect once, not twice. The
+results are ranked by that value and only the ones worth having are surfaced.
+
+That is a decision, not a form. The system does not ask for everything it lacks;
+it computes what each missing record is worth and asks for what clears the bar.
+The acquisition itself runs through the merchant, because a document that was
+never written cannot be retrieved by any amount of searching. On `D00015` one
+record is priced at ₹811 against a case sitting at −₹728, and supplying it flips
+the recommendation. That is the same expected-value machinery that drives Stage
+1, pointed at a different question: not *should we contest this*, but *what is
+it worth knowing before we decide*.
+
 Measured across the 800:
 
 - **316 disputes (40%) show a prompt**, and all 316 unblock if answered.
