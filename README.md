@@ -550,8 +550,9 @@ verifier's rejections back as corrections and allows one retry before
 escalation. Against the mock at a 0.10 injected fault rate it cuts blocked
 packets from 520 to 394. But it retries only when a strip is a drafting error a
 rewrite could fix, so at zero model error it makes zero extra calls, and on
-`gemini-3.1-flash-lite` across 10 disputes with 6 blocked packets it made zero
-retries: every block was structural or temporal. Full numbers in §3.
+`gemini-3.1-flash-lite` across 10 disputes with 5 blocked packets it made zero
+retries, and `qwen3:8b` running locally gave the identical count. Every block was
+structural or temporal. Full numbers in §3.
 
 So the loop exists, it works, and on the model this project ships it correctly
 does nothing. Its value is a function of how bad the drafter is. It is opt-in
@@ -927,9 +928,18 @@ every harness here passes `seed=i` over the enumerated queue. Reproduce these
 numbers without that convention and the injector produces no faults at any rate,
 which looks like the figures being wrong rather than the caller being wrong.
 
-On `gemini-3.1-flash-lite` it also makes zero. Over the first 10 disputes: 10
-drafts, 6 blocked packets, 0 retries, every block structural or temporal. The
-loop's cost on a model that drafts cleanly is zero and so is its benefit.
+On real models it also makes zero, and two of them agree exactly. Over the first
+10 disputes, `gemini-3.1-flash-lite` blocked 5 with 0 retries; `qwen3:8b` at q4
+on a single consumer GPU blocked the same 5, also with 0 retries. Every block was
+structural or temporal. The loop's cost on a model that drafts cleanly is zero
+and so is its benefit.
+
+That agreement is the more useful result. A frontier API and an 8B local model
+producing the same block count is what you would expect if blocks are properties
+of the evidence rather than of the drafter, and it is measured rather than
+argued. It also says the drafting job is genuinely easy once retrieval is
+constrained and the schema is fixed, which is the thesis stated from the other
+direction: the scarce capability is triage and verification, not generation.
 
 That is the honest shape of agency here. The loop substitutes for drafter
 quality, so it is what you would enable to serve this pipeline from a small
