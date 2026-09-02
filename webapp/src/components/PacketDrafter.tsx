@@ -25,6 +25,18 @@ import { Icon, P } from "./ui";
 
 type Props = { disputeId: string };
 
+/* The redraft loop, exposed as a switch rather than a default.
+ *
+ * It is off unless asked for, because every published figure in this project
+ * describes the single-draft path. Turning it on silently would mean the
+ * dashboard and the evaluation were measuring different systems.
+ *
+ * What it demonstrates is narrow and worth stating on screen rather than in a
+ * docstring nobody opens: the loop only retries a claim the verifier rejected
+ * for a reason a rewrite could fix, so on a model that drafts cleanly it makes
+ * no extra calls at all. Its value is a function of how bad the drafter is.
+ */
+
 const FAULTS = [
   { v: undefined, label: "As drafted" },
   { v: 0.2, label: "Inject 20% faults" },
@@ -36,11 +48,12 @@ export default function PacketDrafter({ disputeId }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fault, setFault] = useState<number | undefined>(undefined);
+  const [loop, setLoop] = useState(false);
 
   const run = async (f: number | undefined) => {
     setBusy(true); setErr(null); setFault(f);
     try {
-      setPk(await api.packet(disputeId, f));
+      setPk(await api.packet(disputeId, f, loop));
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -71,6 +84,19 @@ export default function PacketDrafter({ disputeId }: Props) {
         ))}
       </div>
 
+      <label className="tiny" style={{ display: "flex", alignItems: "center",
+                                       gap: 8, marginTop: 12, cursor: "pointer" }}>
+        <input type="checkbox" checked={loop}
+               onChange={(e) => setLoop(e.target.checked)} />
+        <span>
+          Let the drafter retry once when the verifier rejects a claim
+          <span className="faint">
+            {" "}· off by default, because every published figure describes the
+            single-draft path
+          </span>
+        </span>
+      </label>
+
       {err && <p className="tiny" style={{ color: "var(--bad)", marginTop: 10 }}>{err}</p>}
 
       {pk && (
@@ -99,6 +125,44 @@ export default function PacketDrafter({ disputeId }: Props) {
               </div>
             </div>
           </div>
+
+          {pk.redraft && pk.trace && (
+            <div style={{ marginTop: 14 }}>
+              <div className="eyebrow">
+                Retry loop
+                {pk.recovered
+                  ? " · recovered a packet the first draft lost"
+                  : pk.attempts > 1
+                    ? " · retried and did not recover"
+                    : " · declined to retry"}
+              </div>
+              <ul className="why" style={{ marginTop: 6 }}>
+                {pk.trace.map((t, i) => (
+                  <li key={i}>
+                    <b>Attempt {t.attempt}</b>{" "}
+                    {t.skipped ? (
+                      <span className="faint">{t.skipped}</span>
+                    ) : (
+                      <>
+                        {t.drafted} drafted, {t.kept} kept, {t.stripped} stripped
+                        {t.blocked ? ", blocked" : ", submittable"}
+                        {t.discarded && (
+                          <span className="faint"> · discarded: {t.discarded}</span>
+                        )}
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {pk.attempts === 1 && (
+                <p className="tiny faint" style={{ marginTop: 6 }}>
+                  Nothing here a rewrite could fix. A stale record cannot be made
+                  younger and a missing one cannot be written, so the loop spent
+                  no model call.
+                </p>
+              )}
+            </div>
+          )}
 
           {pk.depends_on_merchant_evidence && (
             <div className="notice warn" style={{ marginTop: 12 }}>

@@ -153,7 +153,22 @@ export interface Packet {
   field_check: boolean;
   merchant_artifacts: number;
   depends_on_merchant_evidence: boolean;
+  redraft: boolean;
+  attempts: number;
+  recovered: boolean;
+  trace: PacketAttempt[] | null;
   cached: boolean;
+}
+
+export interface PacketAttempt {
+  attempt: number;
+  drafted?: number;
+  kept?: number;
+  stripped?: number;
+  blocked?: boolean;
+  error?: string | null;
+  skipped?: string;
+  discarded?: string;
 }
 
 export const STRIP_REASON: Record<string, string> = {
@@ -235,9 +250,10 @@ export const api = {
   evidenceSubmit: (id: string, items: { kind: string; value: string }[]) =>
     req<EvidenceResult>(`/disputes/${id}/evidence`,
       { method: "POST", body: JSON.stringify({ items }) }),
-  packet: (id: string, faultRate?: number) =>
+  packet: (id: string, faultRate?: number, redraft?: boolean) =>
     req<Packet>(`/disputes/${id}/packet?force=true`
-      + (faultRate != null ? `&fault_rate=${faultRate}` : ""),
+      + (faultRate != null ? `&fault_rate=${faultRate}` : "")
+      + (redraft ? "&redraft=true" : ""),
       { method: "POST" }),
   customers: () => req<{ derived: boolean; customers: CustomerRow[] }>("/customers"),
   wallet: () => req<Wallet>("/wallet"),

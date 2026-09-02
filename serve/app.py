@@ -209,12 +209,12 @@ def evidence_commit(dispute_id: str, body: EvidenceBody):
 
 @app.post("/api/disputes/{dispute_id}/packet")
 def build_packet(dispute_id: str, fault_rate: float | None = None,
-                 force: bool = False):
+                 force: bool = False, redraft: bool = False):
     d = evidence.hydrate(adapter.find(dispute_id))
     if d is None:
         raise HTTPException(404, "No such dispute")
 
-    r = packet_mod.build(d, fault_rate=fault_rate, force=force)
+    r = packet_mod.build(d, fault_rate=fault_rate, force=force, redraft=redraft)
 
     # Logged whether or not it blocked. A packet that was drafted and refused
     # is the event most worth having in an audit trail, not the least.
@@ -230,6 +230,9 @@ def build_packet(dispute_id: str, fault_rate: float | None = None,
             "fault_rate": r["fault_rate"],
             "merchant_artifacts": r["merchant_artifacts"],
             "depends_on_merchant_evidence": r["depends_on_merchant_evidence"],
+            "redraft": r["redraft"],
+            "attempts": r["attempts"],
+            "recovered": r["recovered"],
         })
     return r
 

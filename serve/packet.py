@@ -41,6 +41,7 @@ for _p in (os.path.join(HERE, "..", "agent"), os.path.join(HERE, "..", "eval")):
 
 import llm as _llm            # noqa: E402
 from draft import draft_claims, retrieve   # noqa: E402
+from redraft import draft_and_verify       # noqa: E402
 from verify import verify     # noqa: E402
 
 # key: (dispute_id, provider, fault_rate, n_supplied) -- so a packet is redrawn
@@ -56,7 +57,8 @@ def provider_name() -> str:
     return (os.environ.get("CB_LLM") or "mock").lower()
 
 
-def build(d: dict, fault_rate: float | None = None, force: bool = False) -> dict:
+def build(d: dict, fault_rate: float | None = None, force: bool = False,
+          redraft: bool = False) -> dict:
     """Draft a packet for one dispute and run the five checks over it.
 
     fault_rate=None means NO FAULTS, not "use whatever CB_FAULT_RATE happens to
@@ -72,7 +74,7 @@ def build(d: dict, fault_rate: float | None = None, force: bool = False) -> dict
     fault_rate = 0.0 if fault_rate is None else float(fault_rate)
     supplied = sum(1 for a in (d.get("artifacts") or {}).values()
                    if a.get("provenance") == "merchant")
-    key = (d["dispute_id"], provider_name(), fault_rate, supplied)
+    key = (d["dispute_id"], provider_name(), fault_rate, supplied, redraft)
     if not force and key in _CACHE:
         return {**_CACHE[key], "cached": True}
 
@@ -82,16 +84,26 @@ def build(d: dict, fault_rate: float | None = None, force: bool = False) -> dict
     # cannot change how the next one behaves.
     prev = os.environ.get("CB_FAULT_RATE")
     os.environ["CB_FAULT_RATE"] = str(fault_rate)
+    trace = None
     try:
         provider = _llm.get_provider()
-        claims, err = draft_claims(d, provider, seed=abs(hash(d["dispute_id"])) % 10_000)
+        seed = abs(hash(d["dispute_id"])) % 10_000
+        if redraft:
+            # The loop runs draft AND verify together, because the retry needs
+            # the verifier's rejections to build its corrections. r is already
+            # verified; the verify() call below is skipped for this branch.
+            r, trace = draft_and_verify(d, provider, seed=seed, max_attempts=2)
+            claims, err = None, None
+        else:
+            claims, err = draft_claims(d, provider, seed=seed)
     finally:
         if prev is None:
             os.environ.pop("CB_FAULT_RATE", None)
         else:
             os.environ["CB_FAULT_RATE"] = prev
 
-    r = verify(d, claims)
+    if not redraft:
+        r = verify(d, claims)
     retrieved = retrieve(d)
 
     # THE TRUST BOUNDARY, MADE VISIBLE.
@@ -117,6 +129,10 @@ def build(d: dict, fault_rate: float | None = None, force: bool = False) -> dict
         "model": os.environ.get("CB_LLM_MODEL") if provider_name() == "gemini" else None,
         "fault_rate": fault_rate,
         "draft_error": err,
+        "redraft": redraft,
+        "attempts": r.get("attempts", 1),
+        "recovered": bool(r.get("recovered")),
+        "trace": trace,
         "artifacts_retrieved": len(retrieved),
         "claims_drafted": r["n_claims"],
         "kept": [
