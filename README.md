@@ -917,6 +917,16 @@ record younger or conjures a document that was never written. Against the mock
 at injected fault rates of 0.10, 0.20 and 0.40 it cuts blocked packets from 520,
 646 and 757 to 394, 523 and 719. At fault 0.00 it makes **zero** extra calls.
 
+```
+CB_FAULT_RATE=0.10 python agent/redraft.py data/holdout.jsonl 800
+```
+
+One note for anyone reproducing that. `MockProvider` seeds its RNG from the
+`seed` argument alone and knows nothing about which dispute it is drafting, so
+every harness here passes `seed=i` over the enumerated queue. Reproduce these
+numbers without that convention and the injector produces no faults at any rate,
+which looks like the figures being wrong rather than the caller being wrong.
+
 On `gemini-3.1-flash-lite` it also makes zero. Over the first 10 disputes: 10
 drafts, 6 blocked packets, 0 retries, every block structural or temporal. The
 loop's cost on a model that drafts cleanly is zero and so is its benefit.

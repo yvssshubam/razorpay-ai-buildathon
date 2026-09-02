@@ -1,29 +1,9 @@
-"""Provider interface for Stage 3 drafting.
-
-Three backends, selected by CB_LLM:
-
-  mock    No network. Emits well-formed claims from the artifacts, and
-          fabricates a CB_FAULT_RATE fraction of them -- citing artifact IDs
-          that do not exist, or asserting facts the artifact does not contain.
-          This is how the verifier is TESTED. A verifier that has never been
-          shown a fabrication is an untested gate.
-
-  ollama  Local model for development. No API key, no per-call cost.
-  gemini  Hosted model for the final measurement run.
-
-The mock is not a stand-in for measurement. Hallucination rate reported from
-the mock is a number you chose. Only the real backends measure anything, and
-the README must say which backend produced the headline figure.
-"""
 import json
 import os
 import random
 import urllib.error
 import urllib.request
 def _load_dotenv():
-    """Read .env from the repo root into os.environ, without overwriting
-    anything already set. A shell-set variable therefore still wins, which
-    keeps the CB_LLM and CB_FAULT_RATE sweeps working."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
     if not os.path.exists(path):
         return
@@ -78,8 +58,6 @@ def _strip_fences(text):
 
 
 class MockProvider:
-    """Deterministic per dispute, so a rerun reproduces the same faults."""
-
     def __init__(self, fault_rate=None):
         self.fault_rate = float(
             os.environ.get("CB_FAULT_RATE", 0.15 if fault_rate is None else fault_rate))
@@ -111,14 +89,6 @@ class MockProvider:
                         "asserts_value": a.get("value"),
                     })
                 else:
-                    # THE FIFTH FAULT CLASS, added after audit. Real ID, right
-                    # kind, right date -- and a fabricated field value. This is
-                    # the fabricated-delivery-timestamp case that motivates the
-                    # whole architecture, and it passed every structural check
-                    # before check 4 existed. The injector deliberately
-                    # generates a fault the pre-audit verifier could not catch;
-                    # an injector that only produces catchable faults measures
-                    # nothing (E1's lesson).
                     claims.append({
                         "text": f"The {a['kind']} record was created on day "
                                 f"{a.get('created_day', 0) - 3}.",
