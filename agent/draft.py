@@ -1,14 +1,3 @@
-"""Stage 3: grounded packet drafting.
-
-The model receives ONLY the artifacts that Stage 2's deterministic lookup
-retrieved for this reason code. It never sees the full order record, so it
-cannot cite something that was never retrieved -- one whole class of
-fabrication is removed by construction rather than by instruction.
-
-Output is a structured claims list, not prose. Every claim carries the ID of
-the artifact that supports it and the evidence kind it asserts. Free prose
-cannot be verified claim-by-claim; this shape can.
-"""
 import json
 import os
 import sys
@@ -51,11 +40,6 @@ def build_context(dispute, retrieved):
 
 
 def retrieve(dispute):
-    """Stage 2. Deterministic: rulebook lookup plus a dict filter, no model.
-
-    Only artifacts whose kind the reason code actually requires are passed
-    downstream. This is the step most submissions will route through an LLM
-    for no reason."""
     required = set(dispute.get("required_evidence") or [])
     arts = dispute.get("artifacts") or {}
     return {aid: a for aid, a in arts.items()
@@ -63,9 +47,6 @@ def retrieve(dispute):
 
 
 def draft_claims(dispute, provider=None, seed=0):
-    """Returns (claims, error). On any failure the claims list is empty, which
-    the verifier will treat as an incomplete packet and escalate. A drafting
-    failure must never become a submission."""
     provider = provider or _llm.get_provider()
     retrieved = retrieve(dispute)
     if not retrieved:
@@ -76,6 +57,10 @@ def draft_claims(dispute, provider=None, seed=0):
     except _llm.LLMError as e:
         return [], f"provider: {e}"
 
+    return parse_claims(raw)
+
+
+def parse_claims(raw):
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
@@ -93,10 +78,6 @@ def draft_claims(dispute, provider=None, seed=0):
                 "artifact_id": str(c["artifact_id"]),
                 "asserts_kind": str(c.get("asserts_kind", "")),
             }
-            # Carried through only when the model supplied BOTH halves. A
-            # half-formed triple is left absent rather than repaired here, so
-            # the verifier sees the drafting failure instead of a patched-up
-            # claim that looks checkable and is not.
             if c.get("asserts_field") and c.get("asserts_value") is not None:
                 row["asserts_field"] = str(c["asserts_field"])
                 row["asserts_value"] = str(c["asserts_value"])

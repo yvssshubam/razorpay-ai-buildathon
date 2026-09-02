@@ -534,18 +534,34 @@ Stages 2 and 4 use no model, the five stages run in the same order every time,
 and nothing replans or selects tools. By most 2026 definitions this is not an
 agent, and it is worth saying so before a reviewer does.
 
-The obvious agentic addition, letting the verifier feed back to the drafter to
-search for alternative artifacts that satisfy a missing requirement, redraft and
-retry, was considered and measured. **Across all 316 blocked packets, zero contain an
-unretrieved artifact that could close the gap.** `retrieve()` already returns
-everything in the record; on D00003 that is 4 artifacts of 4, and the fifth
-required document does not exist. A retrieval loop would search, find nothing,
-and escalate exactly where the pipeline escalates now.
+Two agentic additions were considered, and the difference between them is the
+whole answer.
 
-The bottleneck is not search strategy. It is that the document was never
-written. That is the same finding as the structural intercept, arriving from a
-different direction, and it is the argument against adding agency here rather
-than an admission of missing it.
+**A retrieval loop cannot fire.** Letting the verifier send the drafter back to
+look for alternative artifacts that satisfy a missing requirement sounds right
+and is empty here: **across all 316 blocked packets, zero contain an unretrieved
+artifact that could close the gap.** `retrieve()` already returns everything in
+the record. On D00003 that is 4 artifacts of 4, and the fifth required document
+does not exist. Such a loop would search, find nothing, and escalate exactly
+where the pipeline escalates now.
+
+**A redraft loop can fire, and it is built.** `agent/redraft.py` feeds the
+verifier's rejections back as corrections and allows one retry before
+escalation. Against the mock at a 0.10 injected fault rate it cuts blocked
+packets from 520 to 394. But it retries only when a strip is a drafting error a
+rewrite could fix, so at zero model error it makes zero extra calls, and on
+`gemini-3.1-flash-lite` across 10 disputes with 6 blocked packets it made zero
+retries: every block was structural or temporal. Full numbers in §3.
+
+So the loop exists, it works, and on the model this project ships it correctly
+does nothing. Its value is a function of how bad the drafter is. It is opt-in
+and wired to nothing, because every published figure here was measured without
+it.
+
+The bottleneck is not search strategy, and it is not drafting quality either. It
+is that the document was never written. That is the structural intercept
+arriving from a third direction, and it is the argument against adding agency
+here rather than an admission of missing it.
 
 The defensible position: deterministic where trust is required, a model where
 judgment is required, actions with priced consequences, and a full audit trail.
@@ -861,6 +877,61 @@ hallucination rate would not change definition at all, since they are verified a
 the input documents, not against a label, and do not care whether the disputes
 are synthetic. That is the structural advantage of this design: only one third of
 the scorecard depends on ground truth.
+
+### What would be built next, and why it is not built now
+
+Each of these is a documented edge of the current system rather than a wish. The
+measurement that identifies it is already above.
+
+**Monotone constraints on the classifier.** 65 of the 688 priced evidence items
+come back marginally negative because the model is not monotone in a single
+added record. `HistGradientBoostingClassifier` takes a `monotonic_cst`
+parameter, so constraining `completeness` and `n_present` upward and `n_missing`
+downward would remove that class of quirk by construction. Not done now because
+it means retraining, and retraining against this holdout to fix a cosmetic
+artifact is tuning against our own generator.
+
+**Value canonicalization in check 4.** The field check is strict string
+equality, which is right for generated scalars and wrong for real evidence,
+where the same tracking number arrives as `AWB123456`, `awb-123456` and
+`AWB 123456`. Real deployment needs per-kind normalisation before comparison.
+The strictness is deliberate here: a loose comparison would reintroduce exactly
+the ambiguity the check exists to remove, and on clean inputs there is nothing
+to normalise.
+
+**Per-kind evidence pricing.** The model sees counts and fractions plus a
+one-hot reason code, so it knows a packet has 4 of 5 documents but not which 4.
+With real outcome data it could learn that a signed delivery confirmation is
+worth more than a chat transcript on Visa 13.1, and the evidence panel could
+rank by that rather than by what unblocks the packet.
+
+**A bounded redraft loop.** Built, measured, and deliberately not wired in:
+`agent/redraft.py`. One verifier-fed retry before escalation, with the
+rejections fed back as corrections and a trace of what changed. It is the only
+genuine iteration this design accepts, and the measurements are why it stays
+opt-in.
+
+It retries only when a stripped claim is a drafting error the model could fix.
+Stale artifacts and structural gaps are skipped, because no rewrite makes a
+record younger or conjures a document that was never written. Against the mock
+at injected fault rates of 0.10, 0.20 and 0.40 it cuts blocked packets from 520,
+646 and 757 to 394, 523 and 719. At fault 0.00 it makes **zero** extra calls.
+
+On `gemini-3.1-flash-lite` it also makes zero. Over the first 10 disputes: 10
+drafts, 6 blocked packets, 0 retries, every block structural or temporal. The
+loop's cost on a model that drafts cleanly is zero and so is its benefit.
+
+That is the honest shape of agency here. The loop substitutes for drafter
+quality, so it is what you would enable to serve this pipeline from a small
+local model instead of a frontier API. And the mock numbers above are a null
+hypothesis rather than a result: `MockProvider` ignores the feedback, so its
+retry is a second random sample. Whether a model reading verifier corrections
+writes a better second draft is untested, and needs a model that errs on its
+own.
+
+**Splitting `HUMAN_RESOLVE_RATE` by block reason.** A flat 0.80 over-credits the
+unrepairable blocks that dominate the structural intercept. Real queue outcomes
+would let each block reason carry its own resolve rate.
 
 ---
 
