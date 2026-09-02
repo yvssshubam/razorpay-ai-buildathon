@@ -1,9 +1,29 @@
+"""Provider interface for Stage 3 drafting.
+
+Three backends, selected by CB_LLM:
+
+  mock    No network. Emits well-formed claims from the artifacts, and
+          fabricates a CB_FAULT_RATE fraction of them -- citing artifact IDs
+          that do not exist, or asserting facts the artifact does not contain.
+          This is how the verifier is TESTED. A verifier that has never been
+          shown a fabrication is an untested gate.
+
+  ollama  Local model for development. No API key, no per-call cost.
+  gemini  Hosted model for the final measurement run.
+
+The mock is not a stand-in for measurement. Hallucination rate reported from
+the mock is a number you chose. Only the real backends measure anything, and
+the README must say which backend produced the headline figure.
+"""
 import json
 import os
 import random
 import urllib.error
 import urllib.request
 def _load_dotenv():
+    """Read .env from the repo root into os.environ, without overwriting
+    anything already set. A shell-set variable therefore still wins, which
+    keeps the CB_LLM and CB_FAULT_RATE sweeps working."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
     if not os.path.exists(path):
         return
@@ -58,6 +78,18 @@ def _strip_fences(text):
 
 
 class MockProvider:
+    """Deterministic per SEED, which is the caller's job to vary.
+
+    draft() seeds its RNG from the `seed` argument alone. It knows nothing
+    about which dispute it is drafting, so passing the same seed for every
+    dispute injects the same fault pattern into all of them, and passing
+    seed=0 throughout can inject nothing at all. Every harness here passes
+    seed=i over the enumerated queue, and the published fault curves depend on
+    that convention. It is stated here because it lived only in the callers,
+    and a reader reproducing those numbers without it gets zero faults at every
+    rate and concludes the numbers are wrong when they are right.
+    """
+
     def __init__(self, fault_rate=None):
         self.fault_rate = float(
             os.environ.get("CB_FAULT_RATE", 0.15 if fault_rate is None else fault_rate))
@@ -89,6 +121,14 @@ class MockProvider:
                         "asserts_value": a.get("value"),
                     })
                 else:
+                    # THE FIFTH FAULT CLASS, added after audit. Real ID, right
+                    # kind, right date -- and a fabricated field value. This is
+                    # the fabricated-delivery-timestamp case that motivates the
+                    # whole architecture, and it passed every structural check
+                    # before check 4 existed. The injector deliberately
+                    # generates a fault the pre-audit verifier could not catch;
+                    # an injector that only produces catchable faults measures
+                    # nothing (E1's lesson).
                     claims.append({
                         "text": f"The {a['kind']} record was created on day "
                                 f"{a.get('created_day', 0) - 3}.",
@@ -119,7 +159,17 @@ class OllamaProvider:
             "model": self.model,
             "format": "json",
             "stream": False,
-            "options": {"temperature": 0.2, "seed": seed},
+            # num_ctx and num_predict are set explicitly because Ollama's
+            # default context is 4096 and this prompt does not fit in it. The
+            # system rules plus the retrieved artifacts run to a few thousand
+            # tokens on a five-document reason code, and the model then has to
+            # emit a claim per artifact. At the default the reply is silently
+            # truncated mid-string, json.loads fails, draft_claims returns an
+            # empty list, and the packet blocks -- which looks exactly like a
+            # model that cannot follow the schema. It is not. Observed on
+            # qwen3:8b: correctly shaped JSON, cut off inside the third claim.
+            "options": {"temperature": 0.2, "seed": seed,
+                        "num_ctx": 8192, "num_predict": 2048},
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": user}],
         })
