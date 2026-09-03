@@ -69,9 +69,10 @@ def run(artifacts, router, provider=None, progress=True):
             by_template[truth["template"]] += 1
         else:
             wrong += 1
-            if len(wrong_cases) < 5:
+            if len(wrong_cases) < 50:
                 wrong_cases.append((truth["template"], truth["rendered_as"],
-                                    got["raw_extraction"]))
+                                    got["raw_extraction"], got["tool"],
+                                    got["reference"]))
 
     n = len(artifacts)
     return dict(n=n, ok=ok, miss=miss, wrong=wrong,
@@ -88,8 +89,9 @@ def report(label, r):
     print(f"    tools chosen   {r['tools']}")
     print("    by template:   " + ", ".join(
         f"{t} {v:.0%}" for t, v in sorted(r["by_template"].items())))
-    for tpl, rendered, got in r["wrong_cases"]:
-        print(f"      wrong on {tpl}: document said {rendered!r}, extracted {got!r}")
+    for tpl, rendered, raw, tool, ref in r["wrong_cases"]:
+        print(f"      wrong on {tpl}: document said {rendered!r}, "
+              f"raw={raw!r} ref={ref!r} tool={tool}")
 
 
 if __name__ == "__main__":

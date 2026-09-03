@@ -84,6 +84,8 @@ def canonical(value) -> str:
     s = str(value)
     if ":" in s:                      # stored artifact form, kind:number
         s = s.split(":", 1)[1]
+    if not re.search(r"\d", s):
+        return ""
 
     # Drop a leading alphabetic prefix (TRK, POD, SVC...) before repairing, and
     # only when what remains still carries the reference.
