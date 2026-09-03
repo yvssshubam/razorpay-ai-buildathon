@@ -8,20 +8,30 @@ acquires value when something can arrive before it expires, which means a
 response model, which is item 4. Built separately they are a feature with no
 result and a result with no feature.
 
-WHAT IS ASSUMED, AND HOW IT IS HANDLED. Razorpay's documentation states the
-issuing bank returns a verdict in 15 to 30 days; it does not publish the
-merchant's evidence window, and no reliable figure for Indian merchant response
-behaviour is publicly available. So two numbers here are chosen rather than
-measured:
+WHAT IS ASSUMED, AND HOW IT IS HANDLED. One number here is sourced and one is
+not, and an earlier version of this docstring got the first one wrong. It
+claimed Razorpay "does not publish the merchant's evidence window" and derived
+the window from the 15-to-30-day figure instead. That was a conflation: 15 to 30
+days is the ISSUING BANK's verdict window AFTER representment. Razorpay does
+publish the merchant's own window, and it is far shorter -- 3 business days
+(razorpay.com/blog/chargebacks/).
 
-    RESPONSE_WINDOW_DAYS   how long the merchant has
-    response rate          how often a prompted merchant actually answers
+    RESPONSE_WINDOW_DAYS   SOURCED. 3 business days, modelled as 4 calendar
+                           days. See the constant below.
+    response rate          INVENTED. No reliable figure for Indian merchant
+                           response behaviour is publicly available.
 
-Neither is asserted as a point estimate. Both are swept, and results are
-reported as curves, for the same reason the four cost constants are swept: a
+The response rate is not asserted as a point estimate: it is swept and results
+are reported as curves, for the same reason the cost constants are swept: a
 conclusion that survives every value of an unmeasured parameter does not depend
-on guessing it. Quoting a single number here would be inventing the input and
-then reporting the output as a finding.
+on guessing it. The window is still swept for robustness, but its default is now
+a real published figure rather than a guess.
+
+CONSEQUENCE OF THE CORRECTION, STATED PLAINLY. Under the old 15-45 day windows,
+waiting for a slow merchant was frequently worthwhile. Under a real 3 business
+day window it usually is not -- most merchant archetypes in enrich_v3.py have
+median response times exceeding the entire window. Expect "wait" to be selected
+far less often, and do not reuse any timeline figure measured before this fix.
 
 THE LINK TO INGESTION IS MULTIPLICATIVE, AND THAT IS THE INTERESTING PART. A
 merchant "responding" means attaching a document, and a document only becomes an
@@ -52,11 +62,18 @@ import baselines                    # noqa: E402
 import distributions_ref as dist    # noqa: E402
 import metrics                      # noqa: E402
 
-# Derived from Razorpay's published 15-to-30-day verdict window: the merchant's
-# evidence has to be in well before the bank rules, so the window is modelled as
-# the short end of that range. Swept from 3 to 30 below, and no result in this
-# module depends on the default.
-RESPONSE_WINDOW_DAYS = 15
+# SOURCED (previously conflated with a different number): the 15-to-30-day
+# figure is the ISSUING BANK's verdict window after representment, not the
+# merchant's evidence window -- an earlier version of this comment merged the
+# two. Razorpay's own blog states the actual merchant window directly:
+# "Banks generally provide a window of 3 Business days to represent the
+# chargebacks" (razorpay.com/blog/chargebacks/), corroborated by Razorpay's
+# international-chargebacks blog post. Modelled as 4 calendar days (3 business
+# days + one weekend), matching generator/enrich_v3.py's BASE_WINDOW_DAYS.
+# Still swept below for robustness, and no result in this module depends on
+# the point estimate -- but the point estimate itself is now a real figure,
+# not a guess at the "short end" of an unrelated range.
+RESPONSE_WINDOW_DAYS = 4
 
 # States. Deliberately few: every extra state is a transition that has to be
 # justified, and this problem has one real question -- wait or decide.

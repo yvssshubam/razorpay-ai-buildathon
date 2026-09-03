@@ -6,7 +6,7 @@ repo:
     p(win)        agent/classifier.py::predict_p_win      (calibrated model)
     decision      eval/baselines.py::agent                (EV rule)
     packet        eval/baselines.py::_build_packet        (deterministic)
-    constants     eval/distributions_ref.py               (250/800/0.85/0.80)
+    constants     eval/distributions_ref.py           (250/800/0.9764/0.80)
     rulebook      rulebook/reason_codes.yaml
 
 If this file ever starts computing a probability or a threshold of its own,
@@ -62,7 +62,11 @@ import distributions_ref as dist  # noqa: E402
 CONSTANTS = {
     "contest_cost": dist.CONTEST_COST,
     "human_review_cost": dist.HUMAN_REVIEW_COST,
+    # Base (standard domestic). Instrument-specific values come from
+    # dist.net_recovery(network) -- do not price a dispute off this scalar.
     "net_recovery_fraction": dist.NET_RECOVERY_FRACTION,
+    "net_recovery_premium": dist.NET_RECOVERY_FRACTION + dist.PREMIUM_DELTA,
+    "premium_networks": sorted(dist.PREMIUM_NETWORKS),
     "human_resolve_rate": dist.HUMAN_RESOLVE_RATE,
 }
 
@@ -240,7 +244,7 @@ def _score_uncached(d: dict) -> dict:
     if p is None:  # defensive: policy returns p on every path today
         p = baselines._estimate_p_win(d)
 
-    gross = p * d["amount"] * dist.NET_RECOVERY_FRACTION
+    gross = p * d["amount"] * dist.net_recovery(d.get("network"))
     if blocked:
         # Single definition in eval/metrics.py -- do not re-add the two terms.
         # The packet was already assembled before it was found short, so the

@@ -6,15 +6,18 @@ TWO DEFINITIONS OF "SHOULD HAVE CONTESTED"
 `_ev`        : contesting it had positive expected value at this contest cost.
 
 These disagree, and the disagreement is the product thesis. Holdout case D00187:
-Rs 35,535 at a true win probability of 0.18 returns Rs 5,431 expected against a
-Rs 250 cost. Contesting is correct and it loses roughly four times in five, so
-it is a MISS under _winnable and a HIT under _ev. Both are right. 170 of the
-agent's 196 contested losses are of this shape.
+Rs 35,535 at a true win probability of 0.18 returns Rs 6,245 expected against a
+Rs 250 cost (at the standard domestic recovery of 0.9764; was Rs 5,431 under
+the old, invented 0.85). Contesting is correct and it loses roughly four times
+in five, so it is a MISS under _winnable and a HIT under _ev. Both are right.
+170 of the agent's 196 contested losses are of this shape -- RE-MEASURE this
+count after the recovery-fraction change.
 
 The declines run the other way and are bounded by the arithmetic: at p = 0.8 a
-case must be under Rs 368 to be a correct decline (0.8 * A * 0.85 > 250 gives
-A > 367.6). Any worked example above that amount contests -- check the sign
-before writing one down.
+case must be under Rs 320 to be a correct decline (0.8 * A * 0.9764 > 250
+gives A > 320.1; was Rs 368 under the old 0.85). Amex sits at 0.9646 and so
+has a slightly higher threshold. Any worked example above that amount
+contests -- check the sign before writing one down.
 
 Report both. The gap between them is the money triage saves.
 
@@ -126,7 +129,8 @@ def _should_contest(dispute, contest_cost, definition):
     """
     if definition == "winnable":
         return dispute["label_won"]
-    ev = dispute["_true_p_win"] * dispute["amount"] * dist.NET_RECOVERY_FRACTION
+    ev = (dispute["_true_p_win"] * dispute["amount"]
+          * dist.net_recovery(dispute.get("network")))
     return ev > contest_cost
 
 
@@ -163,7 +167,8 @@ def cost_of_being_wrong(disputes, decisions, contest_cost):
         if x["blocked"] and not d["label_won"]:
             paid_to_lose += escalation_cost(contest_cost)
         if x["outcome"] == "accepted" and d["label_won"]:
-            forfeited = d["amount"] * dist.NET_RECOVERY_FRACTION - contest_cost
+            forfeited = (d["amount"] * dist.net_recovery(d.get("network"))
+                         - contest_cost)
             left_behind += max(forfeited, 0.0)
     return dict(paid_to_lose=round(paid_to_lose, 2),
                 left_behind=round(left_behind, 2),
@@ -183,7 +188,7 @@ def net_rupee_impact(disputes, decisions, contest_cost):
     """
     recovered = costs = 0.0
     for d, x in zip(disputes, decisions):
-        net = d["amount"] * dist.NET_RECOVERY_FRACTION
+        net = d["amount"] * dist.net_recovery(d.get("network"))
         if x["submitted"]:
             costs += contest_cost
             if d["label_won"]:

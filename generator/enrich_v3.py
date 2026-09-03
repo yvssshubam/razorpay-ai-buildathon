@@ -43,14 +43,29 @@ import random
 # reproducible from the same --seed without consuming from the v1 stream.
 SALT = 0x5A17
 
-# Network response windows. Razorpay's docs describe issuer verdicts landing in
-# 15 to 30 days; the merchant's own window to respond is shorter and varies by
-# network. These are round numbers chosen to differ, not published figures.
+# Merchant response window. SOURCED, not invented: Razorpay's own blog states
+# "Banks generally provide a window of 3 Business days to represent the
+# chargebacks" (razorpay.com/blog/chargebacks/), and its international-payments
+# blog independently gives the same figure for cross-border disputes. This
+# replaces an earlier version of this file that used invented per-network
+# values (15-45 days) with no source; those were wrong by 5-15x.
+#
+# No network-specific split is published, so all networks use the same base.
+# The 15-30 day figure elsewhere in the docs/README is the ISSUING BANK'S
+# verdict window after representment -- a different, later stage. Do not
+# conflate the two.
+#
+# "Business days" vs the calendar-day counters used elsewhere in this
+# generator: we approximate 3 business days as 4 calendar days (accounts for
+# one weekend) rather than modelling a weekday calendar, since nothing else in
+# this pipeline tracks day-of-week for scheduling purposes.
+BASE_WINDOW_DAYS = 4
 WINDOW_DAYS = {
-    "visa": 30, "mastercard": 45, "rupay": 30,
-    "amex": 20, "upi": 15, "razorpay": 30,
+    "visa": BASE_WINDOW_DAYS, "mastercard": BASE_WINDOW_DAYS,
+    "rupay": BASE_WINDOW_DAYS, "amex": BASE_WINDOW_DAYS,
+    "upi": BASE_WINDOW_DAYS, "razorpay": BASE_WINDOW_DAYS,
 }
-DEFAULT_WINDOW = 30
+DEFAULT_WINDOW = BASE_WINDOW_DAYS
 
 # Merchant archetypes. The point is spread, not realism: a policy that decides
 # whether to wait for a merchant needs merchants who differ in whether waiting
@@ -104,12 +119,22 @@ def enrich(records, seed, n_merchants=120):
 
     for r in records:
         m = rng.choices(pool, weights=weights)[0]
-        window = WINDOW_DAYS.get((r.get("network") or "").lower(), DEFAULT_WINDOW)
+        base_window = WINDOW_DAYS.get((r.get("network") or "").lower(), DEFAULT_WINDOW)
+        # +/-1 day jitter, floor 2: all networks now share one sourced base
+        # (see comment above), so jitter is what gives the queue varying
+        # urgency instead of a fixed per-network split.
+        window = max(2, base_window + rng.choice([-1, 0, 0, 1]))
 
         # dispute_day is a constant 20 in v1. Received day is drawn relative to
         # it so "days remaining" varies across the queue; a queue where every
         # dispute has the same urgency cannot exercise a deadline policy.
-        received = r["dispute_day"] - rng.randint(0, 12)
+        #
+        # The offset MUST be tied to the window. An earlier version hardcoded
+        # rng.randint(0, 12), which was calibrated for the old 15-45 day
+        # windows; against the corrected 4-day window it put 69% of disputes
+        # past their deadline before the agent ever saw them. Drawing from
+        # (0, window - 1) keeps days-remaining in [1, window] by construction.
+        received = r["dispute_day"] - rng.randint(0, window - 1)
 
         r["merchant_id"] = m["merchant_id"]
         r["day_received"] = received

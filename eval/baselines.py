@@ -144,7 +144,7 @@ def agent(dispute, contest_cost=None):
         return _decision(ACCEPTED, p_win=round(p, 3))
 
     packet, claims, blocked = _build_packet(dispute)
-    gross = p * dispute["amount"] * dist.NET_RECOVERY_FRACTION
+    gross = p * dispute["amount"] * dist.net_recovery(dispute.get("network"))
 
     if blocked:
         ev = gross * dist.HUMAN_RESOLVE_RATE - metrics.escalation_cost(cc)

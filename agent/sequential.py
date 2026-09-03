@@ -3,58 +3,19 @@
 WHAT THIS IS. The shipped policy decides every dispute instantly and, where
 evidence is missing, asks the merchant once with no notion of whether the ask
 is worth making. That is fine when time is free. It is not: a dispute has a
-response window, and a merchant who has ignored four requests will probably
-ignore a fifth.
+deadline, a prompt costs something, and a merchant who has ignored the last
+four requests will probably ignore the fifth.
 
-This module turns that into an explicit choice per dispute:
-
-    ASK          prompt the merchant and wait, if the expected value of the
-                 information exceeds the cost of the delay
-    DECIDE NOW   contest or accept on the evidence that exists
-
-WHY THIS IS THE AGENTIC PIECE AND THE REDRAFT LOOP WAS NOT. The redraft loop
-retries an action. This chooses between actions whose values depend on the
-state of the world and on time: the same dispute is worth asking about on day 3
-and worth deciding on day 28, because the window is closing. It maintains state
-about the entities it deals with and updates that state from what it observes.
 Perception, memory, action selection under a deadline, all with the arithmetic
-in the open and the judgement still deterministic.
+visible.
 
-THE VALUE OF INFORMATION, EXPLICITLY
-
-    EV(ask)  = P(respond in time) x EV(decision | evidence supplied)
-             + (1 - P(respond in time)) x EV(decision | nothing supplied)
-             - cost of one prompt
-
-    EV(now)  = EV(decision | evidence as it stands)
-
-    ask iff EV(ask) > EV(now)
-
-P(respond in time) is the product of two estimates: whether this merchant
-responds at all, and whether they respond before the window shuts. Both come
-from OBSERVED history, never from the generator's latent fields. That
-distinction is the whole experiment: `_true_response_rate` exists in the data
-and this module must not read it, exactly as the classifier must not read
-`_true_p_win`. The leak check at the bottom enforces it.
-
-MERCHANT MEMORY, AND WHY IT IS A BETA POSTERIOR AND NOT AN AVERAGE
-
-A merchant with one observation and one response has an empirical rate of 1.0.
-Acting on that is how a system talks itself into waiting on a merchant it knows
-nothing about. So the estimate is a Beta posterior over a weak prior, which
-starts every merchant near the population rate and moves only as evidence
-accumulates. With 98 of 120 merchants carrying more than one dispute there is
-something real to learn; with a median of 4 disputes each, there is not much,
-and the prior does most of the work for most merchants. That is the honest
-situation and the estimator reflects it rather than hiding it.
-
-WHAT IS INVENTED. Response rates, response delays and window lengths are
+WHAT IS INVENTED. Response rates and response delays are structural
 assumptions from generator/enrich_v3.py, not measurements. Nothing here was
-fitted to make the policy look good. Any result is a statement about the
-mechanism, not about Indian merchants.
+fitted to make the policy look good.
 """
 from __future__ import annotations
 
+import math
 import os
 import sys
 
@@ -80,6 +41,15 @@ PRIOR_ALPHA, PRIOR_BETA = 2.0, 3.0
 # Assumed days until a response arrives, for merchants with no history. Used
 # only to ask "is the window long enough to be worth waiting", never to
 # estimate whether they will answer.
+#
+# 7 is close to the population mean implied by the enrich_v3 archetype mix
+# (0.25*2 + 0.30*9 + 0.30*6 + 0.15*20 = 8.0 days), so it is a fair cold-start
+# guess. It is NOT a measurement: no public figure for Indian merchant
+# response latency exists.
+#
+# NOTE: this value exceeds the entire response window (3 business days), which
+# is why the timeliness term below MUST be a probability rather than a hard
+# gate. See decide().
 PRIOR_RESPONSE_DAYS = 7
 
 
@@ -117,8 +87,8 @@ class MerchantMemory:
         return self.asked.get(merchant_id, 0)
 
 
-def _ev(p_win, amount, blocked, cost):
-    gross = p_win * amount * dist.NET_RECOVERY_FRACTION
+def _ev(p_win, amount, blocked, cost, network=None):
+    gross = p_win * amount * dist.net_recovery(network)
     if blocked:
         return gross * dist.HUMAN_RESOLVE_RATE - metrics.escalation_cost(cost)
     return gross - cost
@@ -133,16 +103,43 @@ def decide(dispute, p_win, blocked, p_win_if_supplied, memory, cost):
     mid = dispute["merchant_id"]
     days_left = dispute["deadline_day"] - dispute["dispute_day"]
 
-    ev_now = _ev(p_win, dispute["amount"], blocked, cost)
-    ev_supplied = _ev(p_win_if_supplied, dispute["amount"], False, cost)
+    ev_now = _ev(p_win, dispute["amount"], blocked, cost,
+                 dispute.get("network"))
+    ev_supplied = _ev(p_win_if_supplied, dispute["amount"], False, cost,
+                      dispute.get("network"))
 
     p_answer = memory.response_rate(mid)
     expected_days = memory.response_days(mid)
-    # A response that arrives after the window is worth nothing. Modelled as a
-    # hard gate rather than a decay because the window really is a cliff: past
-    # the deadline the dispute is lost regardless of what turns up.
-    in_time = days_left > expected_days
-    p_useful = p_answer if in_time else 0.0
+
+    # An answer that lands after the deadline is worth nothing, but "will it
+    # arrive in time" is a PROBABILITY, not a cliff.
+    #
+    # WHY THIS IS NOT A HARD GATE ANY MORE. It used to be
+    # `in_time = days_left > expected_days`, which was harmless while the
+    # response window was modelled at 15-45 days and became ABSORBING once the
+    # window was corrected to Razorpay's published 3 business days. With
+    # days_left in [1, 5] and PRIOR_RESPONSE_DAYS = 7, the gate shut on every
+    # merchant with no history; p_useful was forced to zero; ev_ask collapsed
+    # to ev_now - PROMPT_COST, which never wins; so the policy never asked,
+    # never called memory.observe(), never accumulated delay history, and the
+    # prior stayed at 7 forever. A closed loop that cannot open itself.
+    #
+    # That is a deadlock, not a decision. The "always" policy measured 33
+    # in-time answers out of 316 prompts on the same data, so merchants who
+    # CAN answer inside the window demonstrably exist -- the gated policy was
+    # structurally unable to ever find them.
+    #
+    # Exponential survival with mean expected_days is the least-committed
+    # replacement: it is monotone in both days_left and expected_days, it
+    # never returns exactly zero, and it needs no parameter that is not
+    # already here. It is a MODELLING CHOICE, not a measurement -- the
+    # generator draws one fixed _true_response_days per merchant rather than a
+    # distribution, so no functional form here is "correct". It is chosen for
+    # keeping the learning loop open, and the sanity check is that at
+    # days_left=2, expected_days=7 and the prior p_answer it yields ~0.10,
+    # against the 10.4% in-time rate the "always" policy actually observed.
+    p_in_time = 1.0 - math.exp(-days_left / max(expected_days, 1e-9))
+    p_useful = p_answer * p_in_time
 
     ev_ask = p_useful * ev_supplied + (1 - p_useful) * ev_now - PROMPT_COST
 
@@ -154,7 +151,8 @@ def decide(dispute, p_win, blocked, p_win_if_supplied, memory, cost):
         "p_answer": round(p_answer, 3),
         "expected_days": expected_days,
         "days_left": days_left,
-        "in_time": in_time,
+        "p_in_time": round(p_in_time, 3),
+        "p_useful": round(p_useful, 4),
         "history": memory.seen(mid),
     }
 

@@ -166,7 +166,18 @@ def main():
                   f"{r['submitted']:>6}/{r['accepted']}/{r['escalated']:>3}")
 
     if a.json_out:
-        json.dump(rows, open(a.json_out, "w"), indent=2)
+        # Drop the live MerchantMemory object: it is returned for in-process
+        # inspection, not for serialisation, and json.dump chokes on it.
+        # Keep a scalar summary so the JSON still records how much history
+        # the run actually accumulated.
+        serialisable = []
+        for r in rows:
+            r = dict(r)
+            mem = r.pop("memory", None)
+            if mem is not None:
+                r["merchants_observed"] = len(getattr(mem, "asked", {}) or {})
+            serialisable.append(r)
+        json.dump(serialisable, open(a.json_out, "w"), indent=2)
         print(f"\n  wrote {a.json_out}")
 
 

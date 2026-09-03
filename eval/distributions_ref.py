@@ -103,9 +103,15 @@ def draw_day_of_week(rng):
 # ---------------------------------------------------------------------------
 # COST MODEL
 #
-# All four are assumptions. No public figure exists for any of them in an
-# Indian context. All four are swept one at a time in agent/cost_sweep.py; see
-# data/cost_sweep_results.txt for the ranges over which the headline holds.
+# THREE of the four are assumptions with no public Indian figure. The fourth,
+# NET_RECOVERY_FRACTION, is SOURCED from Razorpay's published platform-fee
+# schedule -- an earlier version of this header said all four were invented,
+# which was true when it was written and is no longer.
+#
+# All four are still swept one at a time in agent/cost_sweep.py; see
+# data/cost_sweep_results.txt for the ranges over which the headline holds. A
+# sourced point estimate is not the same as a measured distribution, so the
+# sweep stays.
 #
 # WHAT EACH ONE COVERS -- stated because the two money terms could otherwise be
 # read as overlapping, and double-counting a fee would bias every decision:
@@ -116,20 +122,47 @@ def draw_day_of_week(rng):
 #                          It does NOT include any network or acquirer fee.
 #
 #   NET_RECOVERY_FRACTION  The share of the disputed amount that comes back
-#                          GIVEN a win. The missing 15% is where the fees live:
-#                          scheme charges and processing not returned with the
-#                          principal. Disjoint from CONTEST_COST.
+#                          GIVEN a win. SOURCED, unlike the other three, and
+#                          VARIES BY INSTRUMENT -- read net_recovery() below
+#                          rather than this scalar. Disjoint from CONTEST_COST.
 #
-#                          MODELLING NOTE: real chargeback fees are levied per
-#                          dispute, flat, not as a share of the amount. A
-#                          proportional model understates the cost of small
-#                          disputes -- at Rs 600 it implies a Rs 90 fee where a
-#                          flat Rs 400 would leave nothing worth recovering. The
-#                          median dispute is Rs 1,500, so this sits in the
-#                          densest part of the distribution and biases toward
-#                          contesting small cases. Stated in the README under
-#                          "Data and its limits" rather than corrected, because
-#                          changing it means another full regeneration.
+#                          A previous version used 0.85 (a 15% haircut). That
+#                          was invented and wrong by ~4-6x. Razorpay's
+#                          published platform fee is 2% + 18% GST for standard
+#                          domestic instruments (Credit/Debit Cards, UPI,
+#                          Netbanking, Wallets) = 2.36% effective, and 3% + GST
+#                          for premium instruments (Amex/Diners, Corporate
+#                          Cards, EMI, Pay Later) and international cards =
+#                          3.54% effective. GST applies to the fee, not the
+#                          transaction amount. The fee is a single blended
+#                          charge covering processing AND technology
+#                          (reconciliation, routing, fraud tooling), which is
+#                          why it is modelled as one fraction per instrument
+#                          rather than separable components.
+#
+#                          NOTE ON UPI: UPI carries 0% interchange MDR by
+#                          government mandate, but Razorpay still charges its
+#                          platform fee on UPI at the standard domestic rate.
+#                          UPI therefore sits at 0.9764, NOT at 1.0. An earlier
+#                          draft of this model put it at 1.0 and was wrong.
+#
+#                          MODELLING NOTE -- THE REMAINING GAP. This captures
+#                          the platform fee only. It does NOT capture
+#                          Razorpay's separate FLAT per-dispute fee (~Rs
+#                          200-750) or representment fee (~Rs 750-1,500), which
+#                          do not scale with amount and have no line item in
+#                          this model. At the Rs 1,500 median dispute that
+#                          missing flat fee EXCEEDS the proportional fee
+#                          captured here, so the cost of contesting small
+#                          disputes is still understated. There is also a
+#                          category question: the platform fee is charged at
+#                          the time of sale and is sunk whether or not a
+#                          dispute occurs, so treating it as a haircut on
+#                          recovery is a simplification. Both are stated in the
+#                          README under "Data and its limits" rather than
+#                          modelled, because adding a flat fee term changes the
+#                          EV rule's shape and there is no published Razorpay
+#                          figure to pin it to.
 #
 #   HUMAN_REVIEW_COST      Analyst time on a packet the verifier blocked. Paid
 #                          ON TOP of CONTEST_COST, because the packet was
@@ -145,5 +178,42 @@ def draw_day_of_week(rng):
 # ---------------------------------------------------------------------------
 CONTEST_COST = 250.0          # INR, merchant effort to assemble and submit
 HUMAN_REVIEW_COST = 800.0     # INR, analyst time on an escalated packet
-NET_RECOVERY_FRACTION = 0.85  # share of the amount recovered on a win
+NET_RECOVERY_FRACTION = 0.9764  # BASE: standard domestic, 2% + 18% GST = 2.36%
 HUMAN_RESOLVE_RATE = 0.80     # share of escalated packets a human can fix
+
+# Instruments charged at the premium 3% + GST rate (= 3.54% effective) rather
+# than the standard domestic 2% + GST. Of the six networks this generator
+# emits, only Amex falls here: Razorpay groups Amex/Diners with Corporate
+# Cards, EMI and Pay Later at the premium rate. Visa, Mastercard, RuPay, UPI
+# and the RZP codes are standard domestic.
+#
+# International cards also sit at 3% + GST, but this dataset carries no
+# domestic/international flag, so cross-border volume on Visa/Mastercard is
+# priced at the domestic rate here. That understates the fee on an unknown
+# share of disputes -- stated in the README, not silently absorbed.
+PREMIUM_NETWORKS = frozenset({"amex"})
+
+# Expressed as a DELTA off the base, not as absolute values, so that
+# agent/cost_sweep.py patching NET_RECOVERY_FRACTION still moves every
+# instrument. Hardcoding absolutes here would make the sweep patch the scalar
+# while the call sites read the dict -- the exact silent-no-op failure the
+# sweep's own "NOT SWEPT" detector exists to catch.
+PREMIUM_DELTA = 0.9646 - 0.9764   # -0.0118
+
+
+def net_recovery(network=None):
+    """Share of the disputed amount recovered on a win, for this instrument.
+
+    THE SINGLE DEFINITION. Call this rather than reading
+    NET_RECOVERY_FRACTION directly, so that the decision path and the scoring
+    path cannot drift apart on instrument handling.
+
+    Unknown or missing network falls back to the standard domestic base, which
+    is the conservative direction: it under-charges the fee rather than
+    over-charging it, so a mislabelled dispute looks slightly MORE contestable
+    rather than less. Failing the other way would silently suppress contests.
+    """
+    base = NET_RECOVERY_FRACTION
+    if (network or "").strip().lower() in PREMIUM_NETWORKS:
+        return base + PREMIUM_DELTA
+    return base

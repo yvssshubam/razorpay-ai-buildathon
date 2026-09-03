@@ -385,11 +385,15 @@ one step is at fixed recovery.
 python eval/timeline_eval.py --recovery 0.83
 ```
 
-Neither the response rate nor the 15-day window is asserted as a point estimate.
-Razorpay publishes a 15-to-30-day verdict window but not the merchant's evidence
-window, and no reliable figure for Indian merchant response behaviour is
-public, so both are swept and the result is reported as a curve for the same
-reason the four cost constants are.
+**The window is 3 business days, and that is published, not assumed.** Razorpay
+states it directly: banks generally allow 3 business days to represent a
+chargeback. The 15-to-30-day figure quoted elsewhere is the *issuing bank's
+verdict window after* representment, a different and later stage. An earlier
+version of this README conflated the two and modelled the merchant's window at
+15 to 45 days, which was wrong by 5 to 15x. It is now modelled as 4 calendar
+days (3 business days plus one weekend).
+
+The response *rate* remains unmeasured and is still swept as a curve.
 
 **What that ₹476,247 is not.** It is not money recovered without a human. Every
 one of those unblocks depends on a record the merchant asserted, and the system
@@ -822,17 +826,29 @@ Five rules keep it honest:
 
 ### What is still not real
 
-**The four cost constants were chosen, not measured.** Contest cost ₹250, human
-review ₹800, net recovery 0.85, human resolve rate 0.80. No public figure exists
-for any of them in an Indian context. This is why they are swept (§1).
+**Three of the four cost constants were chosen, not measured.** Contest cost
+₹250, human review ₹800, human resolve rate 0.80. No public figure exists for
+any of them in an Indian context. This is why they are swept (§1).
 
-**Net recovery is modelled proportionally; real chargeback fees are flat.** The
-0.85 treats the fee as a share of the amount, so it implies a ₹90 fee on a ₹600
-dispute and a ₹3,300 fee on a ₹22,000 one. A flat ₹400 fee would leave the small
-dispute with nothing worth recovering. The distortion is concentrated below about
-₹5,000, which is the densest part of the distribution, and it biases toward
-contesting small disputes. Stated rather than corrected, because changing it
-means another full regeneration.
+**Net recovery is the exception: it is sourced.** Razorpay's published platform
+fee is 2% + 18% GST for standard domestic instruments — cards, UPI, netbanking,
+wallets — giving 2.36% effective, and 3% + GST for premium instruments
+(Amex/Diners, corporate cards, EMI) and international cards, giving 3.54%. So
+recovery on a win is **0.9764** for most instruments and **0.9646** for Amex,
+applied per dispute rather than as one blended number. An earlier version used
+0.85, invented, which overstated the fee by 4 to 6x. Note that UPI carries 0%
+interchange MDR by mandate but still attracts Razorpay's platform fee, so it
+sits at the standard rate, not at 1.0.
+
+**What net recovery still does not capture.** Razorpay also charges a flat
+per-dispute fee (~₹200–750) and a representment fee (~₹750–1,500). Neither
+scales with the amount and neither has a line item here. At the ₹1,500 median
+dispute the missing flat fee **exceeds** the proportional fee that is modelled,
+so the cost of contesting small disputes is still understated. There is also a
+category question: the platform fee is charged at the time of sale and is sunk
+whether or not a dispute follows, so treating it as a haircut on recovery is a
+simplification. Both are stated rather than modelled, because adding a flat term
+changes the EV rule's shape and no published Razorpay figure pins it down.
 
 **The human-queue model is deliberately conservative.** An escalated case is
 assumed to reach a person who can repair the packet but cannot change the facts
@@ -850,7 +866,7 @@ vendor-published and survey-based, predominantly US. No reliable India-specific
 chargeback benchmark is publicly available. Applying them to Indian merchants is
 an assumption, and it is labelled as one wherever it appears. Note also that the
 12-18% figure is *portfolio* net recovery, which already contains the win rate.
-it is not comparable to the 0.85 constant above, which is the share recovered
+it is not comparable to the net recovery constants above, which are the share recovered
 given a win.
 
 **Four rulebook entries are provisional.** Razorpay's evidence page groups codes

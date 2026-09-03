@@ -32,7 +32,11 @@ HOLDOUT = os.path.join(ROOT, "data", "holdout.jsonl")
 SWEEPS = {
     "CONTEST_COST":          [100, 175, 250, 400, 600, 900],
     "HUMAN_REVIEW_COST":     [300, 500, 800, 1200, 1800, 2500],
-    "NET_RECOVERY_FRACTION": [0.50, 0.65, 0.80, 0.90, 1.00],
+    # Sourced range. Razorpay platform fee: 2%+GST standard domestic
+    # (= 0.9764, the default) and 3%+GST premium/international (= 0.9646).
+    # Wider bounds either side for robustness. NOTE: this sweeps the BASE;
+    # dist.net_recovery() applies PREMIUM_DELTA on top, so Amex moves with it.
+    "NET_RECOVERY_FRACTION": [0.90, 0.95, 0.9646, 0.9764, 1.00],
     "HUMAN_RESOLVE_RATE":    [0.20, 0.35, 0.50, 0.65, 0.80],
 }
 

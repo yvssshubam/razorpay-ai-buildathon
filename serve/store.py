@@ -264,6 +264,7 @@ class Store:
                 cost = _cost_of(s)
                 spend += cost
                 auto.append({"id": s["id"], "amount": s["amount"],
+                             "network": s.get("network"),
                              "p_win": s["p_win"], "ev": _ev_of(s), "cost": cost})
             else:
                 held.append({"id": s["id"], "amount": s["amount"],
@@ -290,7 +291,8 @@ class Store:
             max(groups, key=lambda g: g["count"])["code"] if groups else None)
 
         recovery = sum(a["amount"] * a["p_win"]
-                       * adapter.CONSTANTS["net_recovery_fraction"] for a in auto)
+                       * adapter.dist.net_recovery(a.get("network"))
+                       for a in auto)
 
         return {
             "auto": auto, "held": held,
@@ -331,7 +333,6 @@ class Store:
         already been committed.
         """
         results = []
-        frac = adapter.CONSTANTS["net_recovery_fraction"]
         rate = adapter.CONSTANTS["human_resolve_rate"]
         for did, st in list(self.status.items()):
             if st not in (QUEUED, ESCALATED):
@@ -348,7 +349,7 @@ class Store:
                 # on every restart and the demo would not reproduce.
                 won = won and (zlib.crc32(did.encode()) % 100) / 100.0 < rate
             if won:
-                credit = d["amount"] * frac
+                credit = d["amount"] * adapter.dist.net_recovery(d.get("network"))
                 self._post("credit", credit, did, "Recovered from issuer")
                 self.status[did] = WON
             else:
