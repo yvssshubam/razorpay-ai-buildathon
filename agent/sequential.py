@@ -3,15 +3,55 @@
 WHAT THIS IS. The shipped policy decides every dispute instantly and, where
 evidence is missing, asks the merchant once with no notion of whether the ask
 is worth making. That is fine when time is free. It is not: a dispute has a
-deadline, a prompt costs something, and a merchant who has ignored the last
-four requests will probably ignore the fifth.
+response window, and a merchant who has ignored four requests will probably
+ignore a fifth.
 
+This module turns that into an explicit choice per dispute:
+
+    ASK          prompt the merchant and wait, if the expected value of the
+                 information exceeds the cost of the delay
+    DECIDE NOW   contest or accept on the evidence that exists
+
+WHY THIS IS THE AGENTIC PIECE AND THE REDRAFT LOOP WAS NOT. The redraft loop
+retries an action. This chooses between actions whose values depend on the
+state of the world and on time: the same dispute is worth asking about on day 3
+and worth deciding on day 28, because the window is closing. It maintains state
+about the entities it deals with and updates that state from what it observes.
 Perception, memory, action selection under a deadline, all with the arithmetic
-visible.
+in the open and the judgement still deterministic.
 
-WHAT IS INVENTED. Response rates and response delays are structural
+THE VALUE OF INFORMATION, EXPLICITLY
+
+    EV(ask)  = P(respond in time) x EV(decision | evidence supplied)
+             + (1 - P(respond in time)) x EV(decision | nothing supplied)
+             - cost of one prompt
+
+    EV(now)  = EV(decision | evidence as it stands)
+
+    ask iff EV(ask) > EV(now)
+
+P(respond in time) is the product of two estimates: whether this merchant
+responds at all, and whether they respond before the window shuts. Both come
+from OBSERVED history, never from the generator's latent fields. That
+distinction is the whole experiment: `_true_response_rate` exists in the data
+and this module must not read it, exactly as the classifier must not read
+`_true_p_win`. The leak check at the bottom enforces it.
+
+MERCHANT MEMORY, AND WHY IT IS A BETA POSTERIOR AND NOT AN AVERAGE
+
+A merchant with one observation and one response has an empirical rate of 1.0.
+Acting on that is how a system talks itself into waiting on a merchant it knows
+nothing about. So the estimate is a Beta posterior over a weak prior, which
+starts every merchant near the population rate and moves only as evidence
+accumulates. With 98 of 120 merchants carrying more than one dispute there is
+something real to learn; with a median of 4 disputes each, there is not much,
+and the prior does most of the work for most merchants. That is the honest
+situation and the estimator reflects it rather than hiding it.
+
+WHAT IS INVENTED. Response rates, response delays and window lengths are
 assumptions from generator/enrich_v3.py, not measurements. Nothing here was
-fitted to make the policy look good.
+fitted to make the policy look good. Any result is a statement about the
+mechanism, not about Indian merchants.
 """
 from __future__ import annotations
 

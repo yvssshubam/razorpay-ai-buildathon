@@ -57,6 +57,7 @@ for sub in ("eval", "agent", "generator"):
         sys.path.insert(0, p)
 
 import baselines  # noqa: E402
+from enrich_v3 import enrich  # noqa: E402
 import distributions_ref as dist  # noqa: E402
 
 CONSTANTS = {
@@ -116,12 +117,25 @@ def _candidate_paths() -> list[str]:
     return [os.path.join(d, n) for n in ("holdout.jsonl", "train.jsonl")]
 
 
+# Seed for the v3 deadline overlay. MUST match the seed the holdout was
+# enriched with in eval/sequential_eval.py (default 97), or the dashboard shows
+# different deadlines than the published sequential numbers were measured on.
+V3_SEED = int(os.environ.get("CB_V3_SEED", "97"))
+
+
 @lru_cache(maxsize=1)
 def load_disputes() -> tuple[list[dict], str]:
     for path in _candidate_paths():
         if os.path.exists(path):
             with open(path, encoding="utf-8") as fh:
                 rows = [json.loads(l) for l in fh if l.strip()]
+            # Deadlines are NOT in the .jsonl: generate.py never writes them.
+            # enrich_v3 adds them in memory from a salted, independent RNG and
+            # only ever ADDS keys, so this cannot disturb amounts, tiers or
+            # labels. eval/sequential_eval.py does exactly the same thing at
+            # load time; doing it here keeps the dashboard and the published
+            # sequential numbers on the same data.
+            enrich(rows, V3_SEED)
             return rows, path
     raise SystemExit(
         "No dispute file found. Expected data/holdout.jsonl.\n"
@@ -369,6 +383,9 @@ def summary(d: dict) -> dict:
         "description": meta.get("description", ""),
         "amount": round(float(d["amount"]), 2),
         "filed_on": _day_to_date(d.get("dispute_day", 20)),
+        "respond_by": _day_to_date(d["deadline_day"]) if "deadline_day" in d else None,
+        "days_left": (int(d["deadline_day"]) - int(d.get("dispute_day", 20))
+                      if "deadline_day" in d else None),
         "customer": cust,
         "prior_disputes": int(d.get("prior_disputes") or 0),
         "address_match": bool(d.get("address_match")),

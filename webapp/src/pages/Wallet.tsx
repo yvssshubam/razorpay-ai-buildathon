@@ -153,11 +153,27 @@ export default function WalletPage({
                   <span className="spacer" />
                   <b className="num">{inr(policy.daily_spend_cap)}</b>
                 </div>
-                <input id="c" className="range" type="range" min={500} max={20000} step={500}
+                 <input id="c" className="range" type="range" min={5000} max={100000} step={5000}
                        value={policy.daily_spend_cap}
                        onChange={(e) => patch({ daily_spend_cap: Number(e.target.value) })} />
                 <p className="tiny muted" style={{ margin: 0 }}>
                   Hard ceiling on what the agent can spend in a day without you.
+                </p>
+              </div>
+
+              <div>
+                <div className="inline">
+                  <label className="eyebrow" htmlFor="d">Only act with at least</label>
+                  <span className="spacer" />
+                  <b className="num">{policy.min_days_left}d left</b>
+                </div>
+                <input id="d" className="range" type="range" min={0} max={4} step={1}
+                       value={policy.min_days_left}
+                       onChange={(e) => patch({ min_days_left: Number(e.target.value) })} />
+                <p className="tiny muted" style={{ margin: 0 }}>
+                  Razorpay allows 3 business days to represent a chargeback. Cases
+                  closer to the deadline go to a person, who can act faster than a
+                  queue. 0 turns this off.
                 </p>
               </div>
 

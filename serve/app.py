@@ -324,6 +324,8 @@ class Policy(BaseModel):
     max_amount: float | None = None
     require_complete_packet: bool | None = None
     daily_spend_cap: float | None = None
+    # Minimum days remaining before the agent may act unattended. 0 disables.
+    min_days_left: int | None = None
 
 
 @app.get("/api/policy")

@@ -213,6 +213,7 @@ export interface Policy {
   max_amount: number;
   require_complete_packet: boolean;
   daily_spend_cap: number;
+  min_days_left: number;
 }
 
 export interface Preview {
