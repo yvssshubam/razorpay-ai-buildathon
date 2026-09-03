@@ -1,0 +1,48 @@
+{
+  "base": 526279.06,
+  "ceiling": 585389.2,
+  "rows": [
+    {
+      "willingness": 0.0,
+      "typed": 526279.06,
+      "ingested": 526279.06,
+      "responded_typed": 0.0,
+      "responded_ingested": 0.0
+    },
+    {
+      "willingness": 0.2,
+      "typed": 531988.01,
+      "ingested": 531369.772,
+      "responded_typed": 62.0,
+      "responded_ingested": 52.6
+    },
+    {
+      "willingness": 0.4,
+      "typed": 549647.896,
+      "ingested": 543541.05,
+      "responded_typed": 125.4,
+      "responded_ingested": 105.8
+    },
+    {
+      "willingness": 0.6,
+      "typed": 559589.918,
+      "ingested": 555414.85,
+      "responded_typed": 183.0,
+      "responded_ingested": 154.8
+    },
+    {
+      "willingness": 0.8,
+      "typed": 573529.382,
+      "ingested": 562887.222,
+      "responded_typed": 253.6,
+      "responded_ingested": 207.2
+    },
+    {
+      "willingness": 1.0,
+      "typed": 585389.2,
+      "ingested": 573523.6900000001,
+      "responded_typed": 316.0,
+      "responded_ingested": 260.6
+    }
+  ]
+}

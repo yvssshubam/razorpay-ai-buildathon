@@ -335,9 +335,61 @@ Measured across the 800:
 - **240 flip** from "do not contest" to "contest".
 - **172 need exactly one document**, and the verdict turns on that single
   document in 122 of them.
-- **₹476,247 of expected value moves**, if every prompt were answered, which
-  no real merchant population will do. The figure is an upper bound and is
-  never quoted without that attached.
+- **₹476,247 of expected value moves** if every prompt were answered. That
+  figure needs two corrections, and both are large.
+
+**It is a sum of expected values, not of rupees.** Each missing document is
+priced by the EV it would unlock, and those prices are summed. Re-running the
+same scenario and measuring the *realized* net rupee impact with the actual
+outcomes gives **₹59,110**, not ₹476,247. An eight-fold gap.
+
+The cause is a defect this README documents elsewhere: the model is
+over-confident by 21 points on blocked packets specifically (predicted 0.449
+against an observed 0.237, §1). Evidence prices are computed from those
+probabilities, so they inherit the error, and summing 316 of them compounds it.
+**₹59,110 is the number that survives measurement; ₹476,247 is what the model
+believes.** The gap between the two is worth more than either figure, because it
+prices a calibration failure in rupees.
+
+**And it assumes every merchant answers, with a typed reference.** Neither
+holds. Sweeping the two unmeasured parameters, averaged over five seeds:
+
+| merchants who answer | typed references | via document upload |
+|---:|---:|---:|
+| 20% | +₹5,709 | +₹5,091 |
+| 40% | +₹23,369 | +₹17,262 |
+| 60% | +₹33,311 | +₹29,136 |
+| 80% | +₹47,250 | +₹36,608 |
+| 100% | +₹59,110 | +₹47,245 |
+
+The right-hand column applies an ingestion recovery of 83%, because a merchant
+"responding" means attaching a document and a document is only evidence if
+extraction recovers a reference from it. **Effective response rate is
+willingness times recovery**, so extraction accuracy is a multiplier on this
+feature rather than a separate concern.
+
+**Why 83% and not the other two numbers available.** The deterministic router
+recovers 42.7%, but that was measured against a mock provider that cannot read
+prose at all, so every prose-routed document counted as a miss; it understates
+the layer rather than measuring it. `qwen3:8b` recovered 20 of 20 with zero
+wrong values, but on 20 documents the 95% interval runs from roughly 0.83
+upward, so quoting 100% would be quoting the top of what the evidence supports.
+83% is the lower bound of the observation and the figure this table uses.
+
+That sweep also says something the single-parameter view hides: **extraction
+quality is a larger lever here than merchant willingness.** Moving recovery from
+42.7% to 83% is worth more at every willingness level than moving willingness
+one step is at fixed recovery.
+
+```
+python eval/timeline_eval.py
+```
+
+Neither the response rate nor the 15-day window is asserted as a point estimate.
+Razorpay publishes a 15-to-30-day verdict window but not the merchant's evidence
+window, and no reliable figure for Indian merchant response behaviour is
+public, so both are swept and the result is reported as a curve for the same
+reason the four cost constants are.
 
 **What that ₹476,247 is not.** It is not money recovered without a human. Every
 one of those unblocks depends on a record the merchant asserted, and the system
@@ -367,6 +419,53 @@ rather than a tick is friction and an evidence trail, not a security control.
 
 Stating the boundary is the risk-management position. A system that cannot say
 where its own verification stops is not one an acquirer should sit behind.
+
+### Merchant memory does not pay, and the reason is the calibration defect
+
+`agent/sequential.py` keeps per-merchant state -- how often a merchant has
+answered an evidence request, and how quickly -- and uses it to decide whether
+asking is worth the delay. `generator/enrich_v3.py` supplies the merchant IDs
+and traits it learns from, drawn from a separate random stream so no existing
+figure moves. The merchant's true response rate is latent and guarded by
+`assert_no_leaks()`, like every other structural field.
+
+It was built to test one question: does knowing who you are dealing with change
+the decision? Measured across three prompt costs:
+
+| prompt cost | never ask | always ask | value-of-information + memory |
+|---:|---:|---:|---:|
+| ₹15 | 526,279 | **549,078** | 545,412 |
+| ₹150 | **526,279** | 506,418 | 500,388 |
+| ₹400 | **526,279** | 427,418 | 454,587 |
+
+**Selectivity never wins.** When prompting is nearly free, asking everyone beats
+asking selectively, because the memory declines a handful of prompts that would
+have paid. When prompting is expensive, not asking at all beats both.
+
+The failure is specific and it is not the memory's. A rational
+value-of-information rule at ₹400 a prompt should decline almost everything,
+since the alternative is a policy already worth ₹526,279. It sends 207 prompts
+and ends ₹71,692 behind, about ₹346 lost per prompt. It over-values information
+because it prices information with the model's own p(win), **and the model is
+over-confident by 21 points on exactly the blocked disputes it wants to ask
+about** (§1). The information looks worth having because the packet looks more
+winnable than it is.
+
+That is the fourth independent route to the same defect. The capacity sweep
+found it in the escalation decisions, the escalation analysis in the calibration
+by subpopulation, the merchant loop in the gap between ₹476,247 of expected
+value and ₹59,110 realized, and this in a policy that asks too often. All four
+are the same 21 points, priced in four different currencies.
+
+**So the memory ships turned off**, and the honest conclusion is not that
+per-merchant state is useless. It is that no decision layer built on top of this
+classifier can be trusted on blocked packets until the calibration is fixed, and
+the only measured fix costs the generalisation test. Adding intelligence above a
+miscalibrated probability makes the miscalibration more expensive, not less.
+
+```
+python eval/sequential_eval.py --sweep-prompt-cost
+```
 
 ### Robustness: the constants were chosen, not measured
 
