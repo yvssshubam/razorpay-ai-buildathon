@@ -4,7 +4,6 @@ import {
   Card, Empty, Icon, Meter, P, RecoBadge, SortDir, SortHeader,
   StatusBadge, TableSkeleton,
 } from "../components/ui";
-
 type Tab = "open" | "contest" | "accept" | "blocked" | "done" | "all";
 type Col = "ev" | "amount" | "p" | "filed" | "id";
 

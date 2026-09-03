@@ -96,8 +96,7 @@ export default function Dashboard({
             </table>
           </div>
           <div className="card-foot">
-            Expected value is p(win) × amount × {health?.constants.net_recovery_fraction} minus the
-            cost of the branch each case would actually take.
+            Expected value is amount × {health?.constants.net_recovery_fraction} 
           </div>
         </Card>
 

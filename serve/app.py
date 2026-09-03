@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 import adapter
 import evidence
+import extract as extract_mod
 import packet as packet_mod
 from store import STORE
 
@@ -235,6 +236,40 @@ def build_packet(dispute_id: str, fault_rate: float | None = None,
             "recovered": r["recovered"],
         })
     return r
+
+
+# -- document ingestion ----------------------------------------------------
+#
+# Merchant evidence arrives as courier emails, exports, receipts and threads,
+# not as typed reference numbers. These two routes expose the extraction layer
+# so it can be tried without a clone. They call agent/ingest.py unchanged, so
+# what the dashboard shows and what eval/ingest_eval.py measures cannot drift.
+#
+# Nothing here decides anything. The candidate artifact that comes out carries
+# a provenance marker and faces the same five verifier checks as a typed one.
+
+
+class ExtractBody(BaseModel):
+    text: str
+    kind: str
+    created_day: int = 0
+    router: str = "heuristic"
+
+
+@app.post("/api/extract")
+def extract_document(body: ExtractBody):
+    """Document text in, candidate artifact out. Writes nothing, decides nothing."""
+    try:
+        return extract_mod.extract(body.text, body.kind,
+                                   body.created_day, body.router)
+    except extract_mod.ExtractError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/extract/kinds")
+def extract_kinds():
+    """Evidence kinds, read from the rulebook so the dropdown cannot drift."""
+    return {"kinds": extract_mod.kinds()}
 
 
 # -- customers -------------------------------------------------------------

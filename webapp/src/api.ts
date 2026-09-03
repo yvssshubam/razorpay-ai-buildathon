@@ -231,6 +231,18 @@ export interface AuditRow {
   seq: number; at: string; event: string; dispute_id: string | null;
   policy_mode: string; rulebook_version: number; [k: string]: unknown;
 }
+export interface Extraction {
+  kind: string;
+  value: string | null;
+  reference: string | null;
+  created_day: number;
+  tool: "heuristic" | "labelled" | "delimited" | "prose" | string;
+  raw_extraction: string | null;
+  provenance: string;
+  extracted: boolean;
+  source: string;
+  router: string;
+}
 
 /* ---- calls ------------------------------------------------------------- */
 
@@ -255,6 +267,9 @@ export const api = {
       + (faultRate != null ? `&fault_rate=${faultRate}` : "")
       + (redraft ? "&redraft=true" : ""),
       { method: "POST" }),
+      extract: (text: string, kind: string, router: "heuristic" | "model" = "heuristic") =>
+    req<Extraction>("/extract",
+      { method: "POST", body: JSON.stringify({ text, kind, router }) }),
   customers: () => req<{ derived: boolean; customers: CustomerRow[] }>("/customers"),
   wallet: () => req<Wallet>("/wallet"),
   topup: (amount: number) =>

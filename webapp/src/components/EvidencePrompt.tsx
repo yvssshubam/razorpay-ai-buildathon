@@ -29,19 +29,39 @@ import { Icon, P } from "./ui";
  * line saying otherwise and it was false. Provenance marking, not
  * verification, is the control -- see the _INTEGRITY note in
  * serve/evidence.py.
+ *
+ * PASTING A DOCUMENT IS THE SAME ROAD, NOT A SHORTER ONE. Merchant evidence
+ * arrives as courier emails, exports and support threads, so the extractor
+ * reads a reference out of pasted text and fills the field with it. What lands
+ * in that field is a proposal the merchant confirms, not a value the system
+ * commits on its own, and it carries the same provenance as one they typed.
+ * The extractor returning NOTHING is the outcome worth watching: a capture
+ * with no digits in it used to be folded into a plausible number, which is the
+ * one failure the verifier cannot catch, because a faithful claim about a
+ * wrong record passes every check.
  */
 
 type Props = { disputeId: string; onChanged: () => void };
 
+type Pasted = {
+  text: string;
+  busy: boolean;
+  err: string | null;
+  note: string | null;
+};
+
+const EMPTY_PASTE: Pasted = { text: "", busy: false, err: null, note: null };
+
 export default function EvidencePrompt({ disputeId, onChanged }: Props) {
   const [gaps, setGaps] = useState<EvidenceGaps | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [paste, setPaste] = useState<Record<string, Pasted>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
   useEffect(() => {
-    setGaps(null); setValues({}); setErr(null); setDone(null);
+    setGaps(null); setValues({}); setPaste({}); setErr(null); setDone(null);
     api.evidenceGaps(disputeId).then(setGaps).catch((e) => setErr((e as Error).message));
   }, [disputeId]);
 
@@ -51,6 +71,37 @@ export default function EvidencePrompt({ disputeId, onChanged }: Props) {
   const filled = Object.entries(values)
     .filter(([, v]) => v.trim())
     .map(([kind, value]) => ({ kind, value: value.trim() }));
+
+  const setPasteFor = (kind: string, patch: Partial<Pasted>) =>
+    setPaste((p) => ({ ...p, [kind]: { ...(p[kind] ?? EMPTY_PASTE), ...patch } }));
+
+  const extract = async (kind: string) => {
+    const text = (paste[kind]?.text ?? "").trim();
+    if (!text) return;
+    setPasteFor(kind, { busy: true, err: null, note: null });
+    try {
+      const r = await api.extract(text, kind);
+      if (r.extracted && r.reference) {
+        setValues((v) => ({ ...v, [kind]: r.reference as string }));
+        setPasteFor(kind, {
+          busy: false,
+          note: `Read ${r.reference} from the document · ${r.tool}. Check it before adding.`,
+        });
+      } else {
+        // Clear any value a previous extraction left here. A stale reference
+        // sitting under "nothing readable" reads as though the system produced
+        // it from the document just pasted.
+        setValues((v) => ({ ...v, [kind]: "" }));
+        setPasteFor(kind, {
+          busy: false,
+          note: "Nothing readable in that document. Type the reference instead — "
+              + "the extractor declining is safer than it guessing.",
+        });
+      }
+    } catch (e) {
+      setPasteFor(kind, { busy: false, err: (e as Error).message });
+    }
+  };
 
   const submit = async () => {
     if (!filled.length) return;
@@ -63,6 +114,7 @@ export default function EvidencePrompt({ disputeId, onChanged }: Props) {
           : `Recovery updated to ${inr(Math.round(r.after.ev.gross))}.`
       );
       setValues({});
+      setPaste({});
       const g = await api.evidenceGaps(disputeId);
       setGaps(g);
       onChanged();
@@ -92,32 +144,57 @@ export default function EvidencePrompt({ disputeId, onChanged }: Props) {
       </p>
 
       <div style={{ display: "grid", gap: 10 }}>
-        {gaps.items.map((it) => (
-          <div key={it.kind} style={{ display: "grid", gap: 4 }}>
-            <label className="tiny" htmlFor={`ev-${it.kind}`}
-                   style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-              <span>
-                {titleise(it.kind)}
-                {it.state === "stale" && (
-                  <span className="faint"> · on file, but dated after the dispute</span>
-                )}
-              </span>
-              {it.ev > 0 && (
-                <span className="faint" style={{ fontVariantNumeric: "tabular-nums" }}>
-                  worth {inr(Math.round(it.ev))}
-                  {it.flipped && " · would change the recommendation"}
+        {gaps.items.map((it) => {
+          const p = paste[it.kind] ?? EMPTY_PASTE;
+          const open = p.text !== "" || p.note !== null || p.err !== null;
+          return (
+            <div key={it.kind} style={{ display: "grid", gap: 4 }}>
+              <label className="tiny" htmlFor={`ev-${it.kind}`}
+                     style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <span>
+                  {titleise(it.kind)}
+                  {it.state === "stale" && (
+                    <span className="faint"> · on file, but dated after the dispute</span>
+                  )}
                 </span>
-              )}
-            </label>
-            <input
-              id={`ev-${it.kind}`}
-              className="field"
-              placeholder="Reference, tracking number or document ID"
-              value={values[it.kind] ?? ""}
-              onChange={(e) => setValues((v) => ({ ...v, [it.kind]: e.target.value }))}
-            />
-          </div>
-        ))}
+                {it.ev > 0 && (
+                  <span className="faint" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    worth {inr(Math.round(it.ev))}
+                    {it.flipped && " · would change the recommendation"}
+                  </span>
+                )}
+              </label>
+              <input
+                id={`ev-${it.kind}`}
+                className="field"
+                placeholder="Reference, tracking number or document ID"
+                value={values[it.kind] ?? ""}
+                onChange={(e) => setValues((v) => ({ ...v, [it.kind]: e.target.value }))}
+              />
+
+              <textarea
+                className="field"
+                rows={open ? 5 : 2}
+                placeholder="…or paste the courier email, export, receipt or support thread and let the agent read the reference out of it"
+                value={p.text}
+                onChange={(e) => setPasteFor(it.kind, { text: e.target.value, note: null, err: null })}
+                style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              />
+
+              <div className="inline" style={{ gap: 10, flexWrap: "wrap" }}>
+                <button
+                  className="btn"
+                  disabled={!p.text.trim() || p.busy}
+                  onClick={() => extract(it.kind)}
+                >
+                  {p.busy ? "Reading…" : "Read reference from document"}
+                </button>
+                {p.note && <span className="tiny faint">{p.note}</span>}
+                {p.err && <span className="tiny" style={{ color: "var(--bad)" }}>{p.err}</span>}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="inline" style={{ gap: 10, marginTop: 14, flexWrap: "wrap" }}>
@@ -132,9 +209,10 @@ export default function EvidencePrompt({ disputeId, onChanged }: Props) {
       </div>
 
       <p className="tiny faint" style={{ marginTop: 12 }}>
-        Records you add are marked as supplied by you, and stay marked in the
-        audit trail and on the packet. Only add references you can produce if the
-        bank asks — a representment is evidence submitted to a card network.
+        Records you add are marked as supplied by you, whether typed or read out
+        of a document you pasted, and stay marked in the audit trail and on the
+        packet. Only add references you can produce if the bank asks — a
+        representment is evidence submitted to a card network.
       </p>
     </section>
   );

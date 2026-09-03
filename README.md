@@ -345,7 +345,7 @@ outcomes gives **₹59,110**, not ₹476,247. An eight-fold gap.
 
 The cause is a defect this README documents elsewhere: the model is
 over-confident by 21 points on blocked packets specifically (predicted 0.449
-against an observed 0.237, §1). Evidence prices are computed from those
+against an observed 0.237, n=38, `python eval/subpop_calibration.py`). Evidence prices are computed from those
 probabilities, so they inherit the error, and summing 316 of them compounds it.
 **₹59,110 is the number that survives measurement; ₹476,247 is what the model
 believes.** The gap between the two is worth more than either figure, because it
