@@ -1,0 +1,191 @@
+"""Ask, wait, or decide: the sequential layer.
+
+WHAT THIS IS. The shipped policy decides every dispute instantly and, where
+evidence is missing, asks the merchant once with no notion of whether the ask
+is worth making. That is fine when time is free. It is not: a dispute has a
+response window, and a merchant who has ignored four requests will probably
+ignore a fifth.
+
+This module turns that into an explicit choice per dispute:
+
+    ASK          prompt the merchant and wait, if the expected value of the
+                 information exceeds the cost of the delay
+    DECIDE NOW   contest or accept on the evidence that exists
+
+WHY THIS IS THE AGENTIC PIECE AND THE REDRAFT LOOP WAS NOT. The redraft loop
+retries an action. This chooses between actions whose values depend on the
+state of the world and on time: the same dispute is worth asking about on day 3
+and worth deciding on day 28, because the window is closing. It maintains state
+about the entities it deals with and updates that state from what it observes.
+Perception, memory, action selection under a deadline, all with the arithmetic
+in the open and the judgement still deterministic.
+
+THE VALUE OF INFORMATION, EXPLICITLY
+
+    EV(ask)  = P(respond in time) x EV(decision | evidence supplied)
+             + (1 - P(respond in time)) x EV(decision | nothing supplied)
+             - cost of one prompt
+
+    EV(now)  = EV(decision | evidence as it stands)
+
+    ask iff EV(ask) > EV(now)
+
+P(respond in time) is the product of two estimates: whether this merchant
+responds at all, and whether they respond before the window shuts. Both come
+from OBSERVED history, never from the generator's latent fields. That
+distinction is the whole experiment: `_true_response_rate` exists in the data
+and this module must not read it, exactly as the classifier must not read
+`_true_p_win`. The leak check at the bottom enforces it.
+
+MERCHANT MEMORY, AND WHY IT IS A BETA POSTERIOR AND NOT AN AVERAGE
+
+A merchant with one observation and one response has an empirical rate of 1.0.
+Acting on that is how a system talks itself into waiting on a merchant it knows
+nothing about. So the estimate is a Beta posterior over a weak prior, which
+starts every merchant near the population rate and moves only as evidence
+accumulates. With 98 of 120 merchants carrying more than one dispute there is
+something real to learn; with a median of 4 disputes each, there is not much,
+and the prior does most of the work for most merchants. That is the honest
+situation and the estimator reflects it rather than hiding it.
+
+WHAT IS INVENTED. Response rates, response delays and window lengths are
+assumptions from generator/enrich_v3.py, not measurements. Nothing here was
+fitted to make the policy look good. Any result is a statement about the
+mechanism, not about Indian merchants.
+"""
+from __future__ import annotations
+
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+for _p in (HERE, os.path.join(HERE, "..", "eval"), os.path.join(HERE, "..", "serve")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import distributions_ref as dist   # noqa: E402
+import metrics                     # noqa: E402
+
+# Cost of sending one evidence request. Not the contest fee: an email and a
+# dashboard notification are close to free, but not free, and pricing it at
+# zero would make "ask about everything" trivially optimal.
+PROMPT_COST = 15.0
+
+# Beta prior on the response rate. Weak on purpose: 2 successes and 3 failures
+# is worth about five observations, so a merchant with four disputes is still
+# mostly prior. Starting near the population rate rather than at 0.5 would bake
+# in a number this project has no basis for.
+PRIOR_ALPHA, PRIOR_BETA = 2.0, 3.0
+
+# Assumed days until a response arrives, for merchants with no history. Used
+# only to ask "is the window long enough to be worth waiting", never to
+# estimate whether they will answer.
+PRIOR_RESPONSE_DAYS = 7
+
+
+class MerchantMemory:
+    """Per-merchant state, updated only from observed outcomes.
+
+    Deliberately tiny. The interesting question is not whether a richer model
+    of a merchant helps, it is whether ANY memory changes the decision, and a
+    two-counter posterior answers that without inviting the suspicion that the
+    result came from an over-parameterised side model.
+    """
+
+    def __init__(self):
+        self.asked: dict[str, int] = {}
+        self.answered: dict[str, int] = {}
+        self.delays: dict[str, list] = {}
+
+    def response_rate(self, merchant_id):
+        a = self.answered.get(merchant_id, 0)
+        n = self.asked.get(merchant_id, 0)
+        return (PRIOR_ALPHA + a) / (PRIOR_ALPHA + PRIOR_BETA + n)
+
+    def response_days(self, merchant_id):
+        d = self.delays.get(merchant_id) or []
+        return sorted(d)[len(d) // 2] if d else PRIOR_RESPONSE_DAYS
+
+    def observe(self, merchant_id, answered, days=None):
+        self.asked[merchant_id] = self.asked.get(merchant_id, 0) + 1
+        if answered:
+            self.answered[merchant_id] = self.answered.get(merchant_id, 0) + 1
+            if days is not None:
+                self.delays.setdefault(merchant_id, []).append(days)
+
+    def seen(self, merchant_id):
+        return self.asked.get(merchant_id, 0)
+
+
+def _ev(p_win, amount, blocked, cost):
+    gross = p_win * amount * dist.NET_RECOVERY_FRACTION
+    if blocked:
+        return gross * dist.HUMAN_RESOLVE_RATE - metrics.escalation_cost(cost)
+    return gross - cost
+
+
+def decide(dispute, p_win, blocked, p_win_if_supplied, memory, cost):
+    """Choose ASK or DECIDE NOW, and return the arithmetic behind it.
+
+    Returns a dict rather than a bare choice because an agent that acts on a
+    calculation nobody can see is the thing this whole project argues against.
+    """
+    mid = dispute["merchant_id"]
+    days_left = dispute["deadline_day"] - dispute["dispute_day"]
+
+    ev_now = _ev(p_win, dispute["amount"], blocked, cost)
+    ev_supplied = _ev(p_win_if_supplied, dispute["amount"], False, cost)
+
+    p_answer = memory.response_rate(mid)
+    expected_days = memory.response_days(mid)
+    # A response that arrives after the window is worth nothing. Modelled as a
+    # hard gate rather than a decay because the window really is a cliff: past
+    # the deadline the dispute is lost regardless of what turns up.
+    in_time = days_left > expected_days
+    p_useful = p_answer if in_time else 0.0
+
+    ev_ask = p_useful * ev_supplied + (1 - p_useful) * ev_now - PROMPT_COST
+
+    return {
+        "action": "ask" if ev_ask > ev_now else "decide_now",
+        "ev_now": round(ev_now, 2),
+        "ev_ask": round(ev_ask, 2),
+        "ev_if_supplied": round(ev_supplied, 2),
+        "p_answer": round(p_answer, 3),
+        "expected_days": expected_days,
+        "days_left": days_left,
+        "in_time": in_time,
+        "history": memory.seen(mid),
+    }
+
+
+LATENT = ("_true_response_rate", "_true_response_days", "_merchant_archetype",
+          "_true_p_win", "_tier", "_pattern_id")
+
+
+def assert_no_leaks():
+    """Fail loudly if this module ever READS a latent field.
+
+    Same guard as features.assert_no_leaks, same reason. The result of this
+    experiment is only meaningful if the policy estimated response behaviour
+    rather than being told it, and "I did not use it" is not a check.
+
+    It looks for subscript and .get access, not bare mentions, because the
+    documentation above has to be able to name the fields it promises not to
+    touch. An earlier version matched any occurrence and tripped on its own
+    docstring, which is a guard that cannot distinguish talking about a thing
+    from doing it.
+    """
+    src = open(os.path.join(HERE, "sequential.py"), encoding="utf-8").read()
+    bad = []
+    for f in LATENT:
+        for pattern in (f'["{f}"]', f"['{f}']", f'get("{f}"', f"get('{f}'"):
+            if pattern in src:
+                bad.append(f)
+                break
+    if bad:
+        raise AssertionError(f"sequential policy reads latent fields: {bad}")
+    return True
+
+
+assert_no_leaks()
