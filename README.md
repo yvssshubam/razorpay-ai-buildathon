@@ -442,16 +442,41 @@ the decision? Measured across three prompt costs:
 asking selectively, because the memory declines a handful of prompts that would
 have paid. When prompting is expensive, not asking at all beats both.
 
-The failure is specific and it is not the memory's. A rational
-value-of-information rule at ₹400 a prompt should decline almost everything,
-since the alternative is a policy already worth ₹526,279. It sends 207 prompts
-and ends ₹71,692 behind, about ₹346 lost per prompt. It over-values information
-because it prices information with the model's own p(win), **and the model is
-over-confident by 21 points on exactly the blocked disputes it wants to ask
-about** (§1). The information looks worth having because the packet looks more
-winnable than it is.
+The failure is specific and it is not the memory's, which was established by
+ablation rather than argued. Replace the learned memory with an **oracle that
+reads each merchant's true response rate**, a deliberate leak that could never
+ship and exists only to remove estimation error entirely:
 
-That is the fourth independent route to the same defect. The capacity sweep
+| prompt cost | never | always | VOI learned | VOI oracle | perfect knowledge worth |
+|---:|---:|---:|---:|---:|---:|
+| ₹15 | 526,279 | 549,078 | 545,412 | 550,468 | +₹5,056 |
+| ₹150 | **526,279** | 506,418 | 500,388 | 494,014 | −₹6,374 |
+| ₹400 | **526,279** | 427,418 | 454,587 | 458,103 | +₹3,516 |
+
+**Perfect merchant knowledge is worth approximately nothing** — inconsistent in
+sign, and small next to a ₹232,877 headline. Oracle VOI still loses to never
+asking at ₹150 and above.
+
+And the memory is not starved either, which was the competing explanation. The
+median merchant appears in 4 disputes, so a Beta posterior updated four times
+might have sat on its prior. It does not: mean error against the true response
+rate falls **0.314 to 0.201 to 0.147 to 0.085** as asks accumulate. The memory
+learns.
+
+So both candidate causes are ruled out and the remaining one is the classifier.
+A rational value-of-information rule at ₹400 a prompt should decline almost
+everything, since the alternative is a policy already worth ₹526,279. It sends
+207 prompts and ends ₹71,692 behind, about ₹346 lost per prompt. It over-values
+information because it prices information with the model's own p(win), **and the
+model is over-confident by 21 points on exactly the blocked disputes it wants to
+ask about** (§1). The information looks worth having because the packet looks
+more winnable than it is.
+
+```
+python eval/oracle_ablation.py
+```
+
+That is the fifth independent route to the same defect. The capacity sweep
 found it in the escalation decisions, the escalation analysis in the calibration
 by subpopulation, the merchant loop in the gap between ₹476,247 of expected
 value and ₹59,110 realized, and this in a policy that asks too often. All four
