@@ -382,7 +382,7 @@ quality is a larger lever here than merchant willingness.** Moving recovery from
 one step is at fixed recovery.
 
 ```
-python eval/timeline_eval.py
+python eval/timeline_eval.py --recovery 0.83
 ```
 
 Neither the response rate nor the 15-day window is asserted as a point estimate.

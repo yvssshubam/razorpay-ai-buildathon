@@ -12,8 +12,9 @@ than by good intentions.
 """
 import math
 
-LEAK_FIELDS = ("_tier", "_pattern_id", "_true_p_win", "_case_type")
-
+LEAK_FIELDS = ("_tier", "_pattern_id", "_true_p_win", "_case_type",
+               "_true_response_rate", "_true_response_days",
+               "_merchant_archetype")
 NUMERIC = [
     "log_amount",
     "completeness",
