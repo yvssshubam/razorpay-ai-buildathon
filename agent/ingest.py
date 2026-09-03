@@ -131,7 +131,8 @@ def extract_labelled(text):
     """
     pat = re.compile(
         r"\b(" + "|".join(_LABELS) + r")\b[^A-Za-z0-9]{0,20}"
-        r"([A-Z]{0,4}[-/ ]?[\dOolISs][\dOolISs\-/ ]*)",
+        r"(?:[A-Za-z]{1,4}[^A-Za-z0-9]{1,3}){0,2}"
+        r"([A-Z]{0,4}[-/ ]?[\dOolISs]*\d[\dOolISs\-/ ]*)",
         re.IGNORECASE)
     m = pat.search(text)
     return m.group(2).strip(" .-/") if m else None
