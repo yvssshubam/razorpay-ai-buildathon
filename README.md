@@ -33,7 +33,7 @@ every figure in section 1 stays reproducible from the CLI.
 
 ## The problem, end to end
 
-[![Chargeback journey, customer view](docs/customer-journey.png)]
+[![Chargeback journey, customer view](docs/customer-journey.png)](docs/customer-journey.png)
 
 One 10,000 rupee order between a merchant and a customer, from checkout to
 learning loop. It covers the five places evidence is created before any dispute
@@ -42,7 +42,6 @@ structurally different cases that look identical on day 20, the three gates that
 can each end a case, the amount-versus-odds grid that decides what is worth
 fighting, and what a win is actually worth once fees and labour come out.
 
-Editable source: [`docs/chargeback-customer-journey.excalidraw`](docs/chargeback-customer-journey.excalidraw).
 Component-level architecture is in [`docs/architecture.svg`](docs/architecture.svg).
 
 ---
