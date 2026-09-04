@@ -390,3 +390,11 @@ def reset():
     packet_mod.reset()
     adapter._SCORES.clear()
     return {"ok": True}
+
+
+import os as _os
+from fastapi.staticfiles import StaticFiles
+
+_DIST = _os.path.join(adapter.REPO, "webapp", "dist")
+if _os.path.isdir(_DIST):
+    app.mount("/", StaticFiles(directory=_DIST, html=True), name="ui")
