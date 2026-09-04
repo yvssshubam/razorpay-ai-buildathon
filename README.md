@@ -18,21 +18,21 @@ saw, against two mandatory baselines. A metric without a baseline is decoration.
 
 | policy | net rupees | submitted / accepted / escalated | P/R (winnable) | P/R (EV) |
 |---|---:|---|---|---|
-| contest everything | ₹293,402 | 484 / 0 / 316 | 0.39 / 1.00 | 0.67 / 1.00 |
+| contest everything | ₹403,753 | 484 / 0 / 316 | 0.39 / 1.00 | 0.69 / 1.00 |
 | contest nothing | ₹0 | 0 / 800 / 0 | 0.00 / 0.00 | 0.00 / 0.00 |
-| **agent** | **₹526,279** | 392 / 370 / 38 | 0.54 / 0.74 | **0.93** / 0.75 |
+| **agent** | **₹632,361** | 414 / 345 / 41 | 0.54 / 0.78 | **0.93** / 0.76 |
 
-The agent recovers **₹232,877 more than contesting everything**, 1.79 times the
-return on the same 800 disputes, while submitting fewer packets (392 vs 484)
-and sending **one eighth** as many to a human (38 vs 316).
+The agent recovers **₹228,608 more than contesting everything**, 1.57 times the
+return on the same 800 disputes, while submitting fewer packets (414 vs 484)
+and sending **one eighth** as many to a human (41 vs 316).
 
 **That gap is a sum over a heavy-tailed amount distribution, so it needs an
 interval, not a point.** Resampling the 800 disputes with replacement, 2,000
 times:
 
 ```
-agent - contest_all    point   ₹232,877
-                      95% CI   ₹200,944  to  ₹265,592
+agent - contest_all    point   ₹228,608
+                      95% CI   ₹196,809  to  ₹260,272
       draws where the gap <= 0        0 / 2,000
 ```
 
@@ -76,29 +76,29 @@ footnote, because the split between the two columns *is* the triage argument.
 | policy | paid to lose | left behind | total |
 |---|---:|---:|---:|
 | contest everything | ₹326,050 | ₹0 | ₹326,050 |
-| contest nothing | ₹0 | ₹697,677 | ₹697,677 |
-| **agent** | **₹72,200** | **₹77,417** | **₹149,617** |
+| contest nothing | ₹0 | ₹812,408 | ₹812,408 |
+| **agent** | **₹76,250** | **₹76,619** | **₹152,869** |
 
 Contesting everything is wrong in exactly one direction and never leaves money
 behind, which is why it looks safe and costs ₹326,050. The agent is wrong in
-both directions and costs **46% of that**. It accepts some cases it would have
-won. That is ₹77,417, and the column is the honest price of triage. It buys
-that with a 78% reduction in wasted contests. `left_behind` is net of the
+both directions and costs **47% of that**. It accepts some cases it would have
+won. That is ₹76,619, and the column is the honest price of triage. It buys
+that with a 77% reduction in wasted contests. `left_behind` is net of the
 contest cost the attempt would have required.
 
 ### Where the money is, by difficulty tier
 
 | tier | n | P/R (winnable) | P/R (EV) | net ₹ |
 |---|---:|---|---|---:|
-| A, documentary wins | 135 | 0.85 / 0.96 | 1.00 / 0.99 | 234,598 |
-| B, winnable with the right packet | 109 | 0.63 / 0.93 | 0.99 / 0.99 | 161,428 |
-| C, the ambiguous middle | 287 | 0.39 / 0.48 | 0.97 / 0.54 | 94,424 |
-| D, very difficult | 151 | 0.13 / 0.45 | 0.63 / 0.70 | 38,979 |
-| E, structurally unwinnable | 118 | 0.00 / 0.00 | 1.00 / 0.27 | −3,150 |
+| A, documentary wins | 135 | 0.86 / 0.97 | 1.00 / 1.00 | 273,841 |
+| B, winnable with the right packet | 109 | 0.64 / 0.96 | 1.00 / 1.00 | 189,770 |
+| C, the ambiguous middle | 287 | 0.39 / 0.52 | 0.97 / 0.56 | 120,209 |
+| D, very difficult | 151 | 0.16 / 0.60 | 0.61 / 0.71 | 51,690 |
+| E, structurally unwinnable | 118 | 0.00 / 0.00 | 1.00 / 0.23 | −3,150 |
 
 Tier E is the point of the project. The agent wins **nothing** there. Winnable
 precision and recall are both zero, and it has learned to mostly stop trying:
-EV recall of 0.27 means it declines nearly three quarters of the cases a naive
+EV recall of 0.23 means it declines more than three quarters of the cases a naive
 expected-value reading would contest. Industry data puts the representment win
 rate for true fraud chargebacks at 9.27%; for a class of disputes that wins
 roughly one time in eleven, at a cost per attempt, the correct action is to
@@ -256,14 +256,32 @@ CB_P_WIN=heuristic python eval/run_eval.py --data data/holdout.jsonl
 
 |  | net rupees | AUC | Brier | ECE | sub/acc/esc |
 |---|---:|---:|---:|---:|---|
-| heuristic | **531,493** | 0.770 | 0.1939 | 0.0848 | 423/348/29 |
-| calibrated model | 526,279 | 0.803 | 0.1744 | 0.0337 | 392/370/38 |
+| heuristic | 627,190 | 0.770 | 0.1939 | 0.0848 | 434/335/31 |
+| calibrated model | 632,361 | 0.800 | 0.1760 | 0.0285 | 414/345/41 |
 
-**The heuristic nets ₹5,214 more.** The two policies score the same 800
-disputes, so the difference is taken per dispute and then resampled, 2,000
-times. That gives a 95% CI of **[−₹13,233, +₹21,871]**, with 547 of 2,000 draws
-at or below zero. The two are not distinguishable on net rupees, and anyone
-claiming the model wins on this metric is reading noise.
+**The model nets ₹5,171 more, and that is not a result.** The two policies score
+the same 800 disputes, so the difference is taken per dispute and then
+resampled, 2,000 times. That gives a 95% CI of **[−₹24,955, +₹11,867]**, with
+1,361 of 2,000 draws at or below zero. The interval straddles zero and the
+majority of draws favour the heuristic, so the two are **not distinguishable on
+net rupees**, and anyone claiming the model wins on this metric is reading
+noise.
+
+The sign of this comparison has flipped between runs — an earlier version of
+this section reported the heuristic ahead by ₹5,214 — which is itself the
+point: a difference that changes direction when a cost constant is corrected
+was never a difference. What the model does buy is calibration, and that is
+visible in the columns that are not noise: ECE 0.0285 against 0.0848, Brier
+0.1760 against 0.1939. Those matter because the EV rule consumes p(win) as a
+probability, not as a ranking.
+
+The behavioural difference shows up in the mix rather than the total. The
+heuristic contests **434** disputes to the model's 414 and escalates **31** to
+the model's 41, and it leaves **₹91,750** behind against ₹76,619 — it fights
+more, checks less, and forfeits more, arriving at the same net by a worse route.
+Its Tier E net is **−₹7,350** against the model's −₹3,150, which is the clearest
+single symptom: an uncalibrated p(win) keeps contesting a tier that cannot be
+won.
 
 ```
 python eval/run_eval.py --data data/holdout.jsonl --ablation
@@ -285,7 +303,7 @@ model's was not.
 The honest conclusion is that **the classifier is not where the value is.** The
 value is in the EV framing, the verifier gate, and the triage reframe; the
 classifier is a replaceable component that happens to be better calibrated than
-the rule it replaced. A submission claiming a model beat a heuristic by ₹5,214
+the rule it replaced. A submission claiming a model beat a heuristic by ₹5,171
 on n=800 would be claiming something this project's own bootstrap contradicts.
 
 ### The merchant loop, and where verification ends
@@ -344,8 +362,14 @@ same scenario and measuring the *realized* net rupee impact with the actual
 outcomes gives **₹59,110**, not ₹476,247. An eight-fold gap.
 
 The cause is a defect this README documents elsewhere: the model is
-over-confident by 21 points on blocked packets specifically (predicted 0.449
-against an observed 0.237, n=38, `python eval/subpop_calibration.py`). Evidence prices are computed from those
+over-confident by 17 points on blocked packets specifically (predicted 0.442
+against an observed 0.268, n=41, `python eval/subpop_calibration.py`). On the
+414 disputes it submits the model is calibrated to within a point — 0.560
+predicted against 0.568 observed, and *under*-confident at that — so the error
+is not general; it is concentrated on the packets the verifier blocks. Note the
+small n: at 41 cases a single flipped outcome moves the observed rate by more
+than two points, so treat 17 as an indication of direction and rough size, not
+a precise figure. Evidence prices are computed from those
 probabilities, so they inherit the error, and summing 316 of them compounds it.
 **₹59,110 is the number that survives measurement; ₹476,247 is what the model
 believes.** The gap between the two is worth more than either figure, because it
@@ -361,6 +385,16 @@ holds. Sweeping the two unmeasured parameters, averaged over five seeds:
 | 60% | +₹33,311 | +₹29,136 |
 | 80% | +₹47,250 | +₹36,608 |
 | 100% | +₹59,110 | +₹47,245 |
+
+**One assumption inside every cell above.** The sweep varies whether a merchant
+answers, but not what happens when they do: the dispute's win/lose label is
+fixed at generation time, so a merchant supplying the missing record cannot
+change the outcome, only the completeness of the packet and therefore whether
+the verifier blocks it. Real evidence would sometimes turn a loss into a win,
+and this table cannot represent that. Every figure here is therefore a **floor**
+on the value of the evidence loop, measuring only the escalation avoided rather
+than the disputes won. The direction of that bias is worth being explicit about,
+since it runs in this project's favour and is not being claimed as a result.
 
 The right-hand column applies an ingestion recovery of 83%, because a merchant
 "responding" means attaching a document and a document is only evidence if
@@ -385,15 +419,11 @@ one step is at fixed recovery.
 python eval/timeline_eval.py --recovery 0.83
 ```
 
-**The window is 3 business days, and that is published, not assumed.** Razorpay
-states it directly: banks generally allow 3 business days to represent a
-chargeback. The 15-to-30-day figure quoted elsewhere is the *issuing bank's
-verdict window after* representment, a different and later stage. An earlier
-version of this README conflated the two and modelled the merchant's window at
-15 to 45 days, which was wrong by 5 to 15x. It is now modelled as 4 calendar
-days (3 business days plus one weekend).
-
-The response *rate* remains unmeasured and is still swept as a curve.
+Neither the response rate nor the 15-day window is asserted as a point estimate.
+Razorpay publishes a 15-to-30-day verdict window but not the merchant's evidence
+window, and no reliable figure for Indian merchant response behaviour is
+public, so both are swept and the result is reported as a curve for the same
+reason the four cost constants are.
 
 **What that ₹476,247 is not.** It is not money recovered without a human. Every
 one of those unblocks depends on a record the merchant asserted, and the system
@@ -438,53 +468,76 @@ the decision? Measured across three prompt costs:
 
 | prompt cost | never ask | always ask | value-of-information + memory |
 |---:|---:|---:|---:|
-| ₹15 | 526,279 | **549,078** | 545,412 |
-| ₹150 | **526,279** | 506,418 | 500,388 |
-| ₹400 | **526,279** | 427,418 | 454,587 |
+| ₹15 | 632,361 | 634,456 | **636,662** |
+| ₹150 | **632,361** | 591,796 | 629,854 |
+| ₹400 | **632,361** | 512,796 | 631,048 |
 
-**Selectivity never wins.** When prompting is nearly free, asking everyone beats
-asking selectively, because the memory declines a handful of prompts that would
-have paid. When prompting is expensive, not asking at all beats both.
+**Selectivity beats asking always, everywhere — and the effect is small.** VOI
+wins at every prompt cost tested (₹636,662 against ₹634,456 at ₹15, and
+₹631,048 against ₹512,796 at ₹400), and it does so while sending far fewer
+prompts: 309, 251, 119 and 17 as the price rises, against a flat 316. At ₹150
+and above, however, *not asking at all* still edges it, so the honest claim is
+that selective asking dominates indiscriminate asking rather than that asking
+pays. The best case is ₹636,662 against ₹632,361 — **0.7%** — next to a
+₹228,608 triage margin. This layer is a rounding error, and the reason is the
+response window: Razorpay allows 3 business days to represent a chargeback, and
+most merchant archetypes here take longer than that to reply, so there is
+rarely time for an answer to arrive and change anything.
 
-The failure is specific and it is not the memory's, which was established by
-ablation rather than argued. Replace the learned memory with an **oracle that
-reads each merchant's true response rate**, a deliberate leak that could never
-ship and exists only to remove estimation error entirely:
+An earlier version of this section reported that selectivity *never* wins. That
+was measured when the merchant response window was modelled at 15 to 45 days,
+an invented figure, and when the value-of-information policy contained an
+absorbing gate: it compared days-remaining against a 7-day prior as a hard
+cutoff, so under a short window it never asked, never observed, never learned,
+and never escaped. Both are fixed. The finding reversed.
+
+The remaining question is whether the small size of the effect is the memory's
+fault — whether a better estimate of each merchant would pay. It would not, and
+that was established by ablation rather than argued. Replace the learned memory
+with an **oracle that reads each merchant's true response rate**, a deliberate
+leak that could never ship and exists only to remove estimation error entirely:
 
 | prompt cost | never | always | VOI learned | VOI oracle | perfect knowledge worth |
 |---:|---:|---:|---:|---:|---:|
-| ₹15 | 526,279 | 549,078 | 545,412 | 550,468 | +₹5,056 |
-| ₹150 | **526,279** | 506,418 | 500,388 | 494,014 | −₹6,374 |
-| ₹400 | **526,279** | 427,418 | 454,587 | 458,103 | +₹3,516 |
+| ₹15 | 632,361 | 634,456 | 636,662 (309 prompts) | 638,148 (287) | **+₹1,486** |
+| ₹150 | **632,361** | 591,796 | 629,854 (119) | 615,296 (168) | **−₹14,557** |
+| ₹400 | **632,361** | 512,796 | 631,048 (17) | 611,395 (65) | **−₹19,653** |
 
-**Perfect merchant knowledge is worth approximately nothing** — inconsistent in
-sign, and small next to a ₹232,877 headline. Oracle VOI still loses to never
-asking at ₹150 and above.
+**Perfect merchant knowledge is worth approximately nothing, and at realistic
+prompt costs it is worth less than nothing** — +₹1,486 at ₹15, then −₹14,557 and
+−₹19,653. Inconsistent in sign and small next to a ₹228,608 headline.
 
-And the memory is not starved either, which was the competing explanation. The
-median merchant appears in 4 disputes, so a Beta posterior updated four times
-might have sat on its prior. It does not: mean error against the true response
-rate falls **0.314 to 0.201 to 0.147 to 0.085** as asks accumulate. The memory
-learns.
+The negative entries are the informative ones. The oracle knows exactly who
+answers, so it asks *more* than the learned memory does at high prompt cost —
+168 and 65 prompts against 119 and 17 — and those extra prompts lose money. A
+perfect model of the merchant makes the policy worse, which means merchant
+uncertainty was never the binding constraint. The learned memory's ignorance was
+accidentally protective.
 
-So both candidate causes are ruled out and the remaining one is the classifier.
-A rational value-of-information rule at ₹400 a prompt should decline almost
-everything, since the alternative is a policy already worth ₹526,279. It sends
-207 prompts and ends ₹71,692 behind, about ₹346 lost per prompt. It over-values
-information because it prices information with the model's own p(win), **and the
-model is over-confident by 21 points on exactly the blocked disputes it wants to
-ask about** (§1). The information looks worth having because the packet looks
-more winnable than it is.
+And the memory is not starved either, which was the competing explanation. Mean
+error against the true response rate falls **0.259 → 0.244 → 0.064** as asks
+accumulate. The memory learns — though note the third bucket holds only 15
+merchants, against 531 who are never asked at all, so most of the population
+sits permanently on its prior. Under a 3-business-day window there is simply not
+enough asking for history to build.
+
+So both candidate causes are ruled out. What remains is the classifier: the
+policy prices information using the model's own p(win), and the model is
+over-confident on exactly the blocked disputes it wants to ask about (§1). The
+information looks worth having because the packet looks more winnable than it
+is.
 
 ```
 python eval/oracle_ablation.py
 ```
 
-That is the fifth independent route to the same defect. The capacity sweep
-found it in the escalation decisions, the escalation analysis in the calibration
-by subpopulation, the merchant loop in the gap between ₹476,247 of expected
-value and ₹59,110 realized, and this in a policy that asks too often. All four
-are the same 21 points, priced in four different currencies.
+That is another route to the same defect. The capacity sweep found it in the
+escalation decisions, the subpopulation calibration in the 17-point gap on
+blocked packets, the merchant loop in the distance between ₹476,247 of expected
+value and ₹59,110 realized, and this in a policy that prices information too
+generously. They are the same error seen in different currencies — with the
+caveat that these are four views of one measurement rather than four
+independent confirmations of it, since all of them consume the same p(win).
 
 **So the memory ships turned off**, and the honest conclusion is not that
 per-merchant state is useless. It is that no decision layer built on top of this
@@ -508,14 +561,14 @@ a time (`data/cost_sweep_results.txt`):
 | contest cost | ₹100 → ₹900 (9×) | 605,729 → 335,964 | 413,402 → **−226,598** |
 | human review cost | ₹300 → ₹2,500 (8×) | 549,581 → 511,300 (−7.0%) | 451,402 → **−243,798** |
 | net recovery | 0.5 → 1.0 | 265,658 → 650,516 | **−13,858** → 425,085 |
-| human resolve rate | 0.2 → 0.8 | 508,338 → 526,279 (+3.5%) | 203,586 → 293,402 (+44%) |
+| human resolve rate | 0.2 → 0.8 | 602,925 → 632,361 (+4.9%) | 300,580 → 403,753 (+34%) |
 
 The agent wins at every value tested. More usefully, it is far *less sensitive*:
 across an 8× change in review cost it moves 7.0%, while contest-all turns
 negative. Contest-all goes negative in three of the four sweeps; the agent never
-does, and its worst value anywhere is ₹265,658.
+does, and its worst value anywhere is ₹409,631.
 
-The mechanism is simple. The agent escalates 38 packets; contest-all escalates
+The mechanism is simple. The agent escalates 41 packets; contest-all escalates
 316. Where the true cost of human review is unknown, and it is, that
 difference in exposure is the argument.
 
@@ -524,23 +577,58 @@ difference in exposure is the argument.
 *The first is that the defaults look cherry-picked.* The shipped human resolve
 rate, 0.80, sits at the top of its swept range, which reads like quoting the
 headline from the favourable end. Check the direction: the agent's lead over
-contest-all is ₹304,752 at a resolve rate of 0.2 and ₹232,877 at 0.8. The
+contest-all is ₹302,345 at a resolve rate of 0.2 and ₹228,608 at 0.8. The
 **margin is narrowest at the default**, because a generous resolve rate helps
-the policy escalating 316 packets far more than the one escalating 38. Every
+the policy escalating 316 packets far more than the one escalating 41. Every
 untested value below the default widens the gap. Contest cost runs the other
-way. The margin grows from ₹192,327 at ₹100 to ₹562,562 at ₹900, so ₹250 sits
+way. The margin grows from ₹188,441 at ₹100 to ₹525,878 at ₹900, so ₹250 sits
 in the lower third, and only an implausibly cheap ₹100 contest produces a
 narrower margin than the shipped figure.
 
+**What Razorpay's own fee schedule would do to this.** The ₹250 contest cost is
+merchant effort only, and Razorpay publishes chargeback cost in five layers, two
+of which are charged solely when a merchant contests: a representment fee of
+₹750 to ₹1,500 and evidence submission of ₹200 to ₹500. Taking midpoints and
+adding the ₹250 of effort gives roughly **₹1,725 a contest**, seven times the
+shipped constant. The harness takes it as a flag, so the claim is one command:
+
+```
+python eval/run_eval.py --data data/holdout.jsonl --contest-cost 1725
+```
+
+| | agent | contest everything |
+|---|---:|---:|
+| net rupees | **₹250,776** | **−₹776,247** |
+| submitted / accepted / escalated | 108 / 681 / 11 | 484 / 0 / 316 |
+| precision (winnable / EV) | 0.59 / 0.96 | 0.39 / 0.17 |
+
+At that price **contesting everything loses ₹776,247**, and doing nothing at all
+beats it by that entire amount. The agent contests 108 disputes instead of 414
+and stays positive. Nothing was retuned to produce this: the EV rule reads the
+higher cost and declines more, which is the whole point of deciding in rupees
+rather than on a confidence score. It is also the cleanest statement of the
+thesis in this README — at a realistic fee level the winning policy is mostly
+not to play, and EV precision *rises* to 0.96 as the bar goes up.
+
+**Why it is not the shipped default.** What Razorpay publishes is the fee
+*amounts*, not the *trigger*. Whether the representment and evidence fees are
+charged on receipt of the dispute, on submitting a representment, or only on
+losing one decides whether they belong in this constant at all: a fee charged on
+both contesting and accepting cancels out of the comparison, and a fee charged
+only on a loss belongs inside the expectation rather than subtracted flat. Until
+that is confirmed, treating ₹1,725 as a flat per-contest cost is an assumption
+layered on a published number, and the shipped default stays at the figure whose
+definition is unambiguous. The sweep above covers the range regardless.
+
 *The second is the one actually worth worrying about, so here it is stated
 plainly.* The result is most exposed to **human review being cheap**. At ₹300 a
-review the margin falls to **₹98,179**, the narrowest figure anywhere in the
-sweep, 58% below the headline. The mechanism is direct: the agent's advantage is
-substantially an escalation-exposure advantage, 38 packets against 316, and if a
+review the margin falls to **₹94,248**, the narrowest figure anywhere in the
+sweep, 59% below the headline. The mechanism is direct: the agent's advantage is
+substantially an escalation-exposure advantage, 41 packets against 316, and if a
 human costs almost nothing then contest-all's queue costs almost nothing either.
 The agent still wins, and it still wins at every value tested. But a reviewer who
-believes chargeback review is cheap labour should be shown ₹98,179 rather than
-₹232,877, and the honest version of the claim is that the *sign* is robust
+believes chargeback review is cheap labour should be shown ₹94,248 rather than
+₹228,608, and the honest version of the claim is that the *sign* is robust
 across every constant while the *size* is not.
 
 A fifth constant, the ₹1,500 median order value, is **not** swept: varying it
@@ -551,23 +639,30 @@ disclosed as a stated assumption in §3.
 
 An obvious alternative to expected value is a confidence floor: never contest
 below some p(win), whatever the amount. Swept from 0.00 to 0.30 on the holdout,
-it peaks at zero and loses **₹28,154 at the very first step above it**.
+it peaks at zero and loses **₹32,378 at the very first step above it**.
 
 ```
-floor   net rupees
-0.00     526,279   <- peak
-0.05     498,125
-0.10     493,547
-0.15     478,932
-0.20     479,143
-0.25     483,193
-0.30     479,385
+floor   net rupees   sub/acc/esc
+0.00     632,361     414/345/41   <- peak
+0.05     599,983     413/346/41
+0.10     591,433     405/354/41
+0.15     574,353     402/360/38
+0.20     574,142     394/369/37
+0.25     577,920     378/386/36
+0.30     570,010     342/426/32
 ```
 
-Tier D collapses from ₹38,979 to ₹10,825 at a floor of 0.05 and turns negative
-by 0.15. The floor kills the high-amount low-probability cases that
+Every value above zero is worse, and the damage lands almost entirely in one
+tier. Tier D falls from **₹51,690 to ₹19,312** at a floor of 0.05, turns
+negative by 0.15, and is still negative at 0.30 — while Tiers A and B do not
+move at all, because their cases clear any floor in this range. The floor is
+not trading breadth for quality; it is deleting one band of the distribution. The floor kills the high-amount low-probability cases that
 expected value says are worth attempting. A ₹2,00,000 dispute at 20% odds is
-worth an analyst's hour, and a floor at 0.25 throws it away. It cannot
+worth an analyst's hour, and a floor at 0.25 throws it away. Note what the floor
+*does* buy, since it is not nothing: winnable precision rises 0.54 to 0.60 and
+EV precision 0.93 to 0.96 across the sweep. The policy gets more accurate about
+what it contests and poorer for it, which is the whole argument for scoring in
+rupees rather than in precision. It cannot
 distinguish "low probability because unwinnable" from "low probability but a
 large amount", and the second is where triage earns its keep.
 
@@ -586,22 +681,37 @@ cases; positive T demands a margin.
 
 ```
    T      net rupees   sub/acc/esc
--300         525,050   484/264/52
--200         526,619   479/274/47
--100         534,286   445/314/41   <- highest
-   0         526,279   392/370/38   <- shipped
-+100         528,063   334/434/32
-+200         519,051   297/473/30
-+300         505,840   266/508/26
+-300         627,559   484/261/55
+-250         627,577   484/263/53
+-200         629,627   480/268/52
+-150         634,794   466/284/50
+-100         634,826   451/302/47
+ -50         639,441   434/322/44   <- highest
+   0         632,361   414/345/41   <- shipped
+ +50         628,108   386/373/41
++100         624,864   364/395/41
++150         618,377   337/425/38
++200         616,629   314/449/37
++250         609,225   304/462/34
++300         608,397   287/482/31
 ```
 
 The optimum is interior rather than on a boundary, which is what the sweep was
-for. But **it is not a real gain and it is not being claimed as one.** The
-₹8,007 improvement at T = −₹100 has a bootstrap 95% CI of [−₹1,493, ₹19,010],
-with 107 of 2,000 resamples at or below zero. The curve is flat to within ±1.7%
-across a ₹400 band. The defensible statement is the weaker one: *the boundary at
-zero cannot be improved on at 95% confidence, and the policy is not
-systematically mistuned in either direction.* T stays at zero.
+for. But **it is not a real gain and it is not being claimed as one.** The best
+value, T = −₹50, is worth ₹7,080 over the shipped zero — under 1.2% — and the
+curve is flat to within ±2.5% across the whole ₹600 band, with no sharp
+structure anywhere in it. A gain that small, on a single holdout, from a
+parameter chosen after seeing that holdout, is a tuning artifact rather than a
+finding. The defensible statement is the weaker one: *the boundary at zero
+cannot be meaningfully improved on, and the policy is not systematically
+mistuned in either direction.* T stays at zero.
+
+That the optimum sits slightly **below** zero is worth one line, because it is
+the same effect the two precision columns measure: at T = −₹50 the rule
+contests marginally EV-negative cases and still nets more, which is what a
+heavy-tailed amount distribution does to a threshold rule. It is not evidence
+that contesting more is better in general — every value above −₹50, including
+the ₹300 end, is worse.
 
 ```
 python eval/run_eval.py --data data/holdout.jsonl --ev-sweep
@@ -826,29 +936,17 @@ Five rules keep it honest:
 
 ### What is still not real
 
-**Three of the four cost constants were chosen, not measured.** Contest cost
-₹250, human review ₹800, human resolve rate 0.80. No public figure exists for
-any of them in an Indian context. This is why they are swept (§1).
+**The four cost constants were chosen, not measured.** Contest cost ₹250, human
+review ₹800, net recovery 0.85, human resolve rate 0.80. No public figure exists
+for any of them in an Indian context. This is why they are swept (§1).
 
-**Net recovery is the exception: it is sourced.** Razorpay's published platform
-fee is 2% + 18% GST for standard domestic instruments — cards, UPI, netbanking,
-wallets — giving 2.36% effective, and 3% + GST for premium instruments
-(Amex/Diners, corporate cards, EMI) and international cards, giving 3.54%. So
-recovery on a win is **0.9764** for most instruments and **0.9646** for Amex,
-applied per dispute rather than as one blended number. An earlier version used
-0.85, invented, which overstated the fee by 4 to 6x. Note that UPI carries 0%
-interchange MDR by mandate but still attracts Razorpay's platform fee, so it
-sits at the standard rate, not at 1.0.
-
-**What net recovery still does not capture.** Razorpay also charges a flat
-per-dispute fee (~₹200–750) and a representment fee (~₹750–1,500). Neither
-scales with the amount and neither has a line item here. At the ₹1,500 median
-dispute the missing flat fee **exceeds** the proportional fee that is modelled,
-so the cost of contesting small disputes is still understated. There is also a
-category question: the platform fee is charged at the time of sale and is sunk
-whether or not a dispute follows, so treating it as a haircut on recovery is a
-simplification. Both are stated rather than modelled, because adding a flat term
-changes the EV rule's shape and no published Razorpay figure pins it down.
+**Net recovery is modelled proportionally; real chargeback fees are flat.** The
+0.85 treats the fee as a share of the amount, so it implies a ₹90 fee on a ₹600
+dispute and a ₹3,300 fee on a ₹22,000 one. A flat ₹400 fee would leave the small
+dispute with nothing worth recovering. The distortion is concentrated below about
+₹5,000, which is the densest part of the distribution, and it biases toward
+contesting small disputes. Stated rather than corrected, because changing it
+means another full regeneration.
 
 **The human-queue model is deliberately conservative.** An escalated case is
 assumed to reach a person who can repair the packet but cannot change the facts
@@ -866,7 +964,7 @@ vendor-published and survey-based, predominantly US. No reliable India-specific
 chargeback benchmark is publicly available. Applying them to Indian merchants is
 an assumption, and it is labelled as one wherever it appears. Note also that the
 12-18% figure is *portfolio* net recovery, which already contains the win rate.
-it is not comparable to the net recovery constants above, which are the share recovered
+it is not comparable to the 0.85 constant above, which is the share recovered
 given a win.
 
 **Four rulebook entries are provisional.** Razorpay's evidence page groups codes
@@ -902,7 +1000,7 @@ is unnecessary; that is exactly what the fault-injection curve is for.
 parameters differ between the two sets by design; amounts do not, because both
 are samples from the same real distribution.
 
-### Nine errors found and corrected during the build
+### Eleven errors found and corrected during the build
 
 All are in the git history rather than quietly fixed, because how a system fails
 is part of what it is. Most produced a *plausible number* rather than a crash,
@@ -940,8 +1038,9 @@ charged `HUMAN_REVIEW_COST` alone. The agent escalated whenever gross recovery
 cleared ₹1,000; the scorer only profited above ₹1,312.50. Every case in that band
 was escalated by the policy and booked as a loss by the metric, the same
 decision-versus-scoring drift as the cost sweep bug, one layer down. Correcting
-it moved the headline from ₹529,555 to ₹526,279, cut the human queue from 50 to
-38, and removed a spurious ₹10,250 result from the floor sweep.
+it moved the headline from ₹529,555 to ₹526,279 (figures as they stood at the
+time of that fix, before the net-recovery constant was corrected), cut the
+human queue from 50 to 38, and removed a spurious ₹10,250 result from the floor sweep.
 
 **And the fix for that was reported as more complete than it was.** The commit
 message and this README both said the escalation cost now had a single
@@ -1009,6 +1108,36 @@ when the merchant supplies the record there is nothing to compare it against.
 Written inside a comment block headed `_INTEGRITY`, which is the worst place in
 a codebase to be confidently wrong, and shown to the one person best placed to
 exploit the gap. Rewritten as a trust boundary; see §1.
+
+**The verifier was described as running six checks when it runs five.** An
+earlier draft of the verifier section listed six named checks; the shipped gate
+has five, the sixth having been folded into the field-level value check rather
+than dropped. Nothing in the code was wrong and no packet was mis-verified — the
+count in the prose simply did not match the count in `agent/verify.py`. It is
+listed here rather than silently corrected because it belongs to the same
+category as the three reporting errors above: the system was more trustworthy
+than its own description of it, which is the harmless direction of that failure
+but is still a failure of the description. A reviewer counting checks against
+the code would have found it in under a minute.
+
+**A leftover environment variable silently altered a published measurement.**
+`eval/subpop_calibration.py` was run immediately after the confidence-floor
+sweep, which sets `CB_P_FLOOR` per run. The variable was still set to 0.3, so
+the calibration gap was measured on a policy with a confidence floor applied
+rather than on the shipped one — 32 blocked packets instead of 41, and a gap of
+19 points instead of 17. Nothing crashed and the number looked entirely
+reasonable; it was caught only because the blocked count disagreed with the
+scorecard elsewhere in this README, and 342/426/32 turned out to match the
+`CB_P_FLOOR=0.3` row of the floor sweep exactly.
+
+Three of the runs behind this README were altered by environment state at some
+point during the build: a stale model pickle, a cached `adapter.CONSTANTS` in a
+running server, and this. All three produced plausible figures rather than
+errors. The structural fix is for the eval entry points to print every active
+`CB_*` variable in their header, so that a contaminated run announces itself;
+that is not built, and the mitigation in the meantime is that every published
+figure has a command next to it and a cross-check somewhere else in the
+document.
 
 ### What would change with production data
 
