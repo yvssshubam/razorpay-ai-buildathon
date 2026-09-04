@@ -125,7 +125,7 @@ export default function WalletPage({
                   <span className="spacer" />
                   <b className="num">{pct(policy.min_p_win)}</b>
                 </div>
-                <input id="p" className="range" type="range" min={0.5} max={0.95} step={0.05}
+                <input id="p" className="range" type="range" min={0.5} max={0.9} step={0.05}
                        value={policy.min_p_win}
                        onChange={(e) => patch({ min_p_win: Number(e.target.value) })} />
                 <p className="tiny muted" style={{ margin: 0 }}>
@@ -139,7 +139,7 @@ export default function WalletPage({
                   <span className="spacer" />
                   <b className="num">{inr(policy.max_amount)}</b>
                 </div>
-                <input id="a" className="range" type="range" min={1000} max={50000} step={1000}
+                <input id="a" className="range" type="range" min={1000} max={15000} step={500}
                        value={policy.max_amount}
                        onChange={(e) => patch({ max_amount: Number(e.target.value) })} />
                 <p className="tiny muted" style={{ margin: 0 }}>
@@ -153,27 +153,11 @@ export default function WalletPage({
                   <span className="spacer" />
                   <b className="num">{inr(policy.daily_spend_cap)}</b>
                 </div>
-                 <input id="c" className="range" type="range" min={5000} max={100000} step={5000}
+                <input id="c" className="range" type="range" min={500} max={20000} step={500}
                        value={policy.daily_spend_cap}
                        onChange={(e) => patch({ daily_spend_cap: Number(e.target.value) })} />
                 <p className="tiny muted" style={{ margin: 0 }}>
                   Hard ceiling on what the agent can spend in a day without you.
-                </p>
-              </div>
-
-              <div>
-                <div className="inline">
-                  <label className="eyebrow" htmlFor="d">Only act with at least</label>
-                  <span className="spacer" />
-                  <b className="num">{policy.min_days_left}d left</b>
-                </div>
-                <input id="d" className="range" type="range" min={0} max={4} step={1}
-                       value={policy.min_days_left}
-                       onChange={(e) => patch({ min_days_left: Number(e.target.value) })} />
-                <p className="tiny muted" style={{ margin: 0 }}>
-                  Razorpay allows 3 business days to represent a chargeback. Cases
-                  closer to the deadline go to a person, who can act faster than a
-                  queue. 0 turns this off.
                 </p>
               </div>
 
@@ -216,7 +200,48 @@ export default function WalletPage({
                     <div className="kv"><dt>Projected recovery</dt>
                       <dd className="num" style={{ color: "var(--good)" }}>
                         {inr(preview.projected_recovery)}</dd></div>
+                    <div className="kv"><dt><b>Projected net</b></dt>
+                      <dd className="num" style={{
+                        fontSize: 16,
+                        color: preview.projected_net >= 0 ? "var(--good)" : "var(--bad)",
+                      }}>{inr(preview.projected_net)}</dd></div>
                   </dl>
+
+                  {preview.binding_label && (
+                    <p className="tiny muted" style={{ margin: "8px 0 0" }}>
+                      Limited by: <b>{preview.binding_label}</b>.{" "}
+                      {preview.budget_exhausted
+                        ? "Your cap sets how many run; the other limits set which ones."
+                        : "Raising your cap would let more through."}
+                    </p>
+                  )}
+
+                  {preview.auto.length > 0 && (
+                    <div style={{ marginTop: 14 }}>
+                      <div className="eyebrow" style={{ marginBottom: 6 }}>
+                        Order the agent will work in
+                      </div>
+                      <p className="tiny muted" style={{ margin: "0 0 6px" }}>
+                        Closest to its deadline first. A dispute with days in hand
+                        is still contestable tomorrow; one expiring tonight is not.
+                      </p>
+                      <div className="scroll-y">
+                        {preview.auto.slice(0, 12).map((a) => (
+                          <div className="inline tiny" key={a.id}
+                               style={{ padding: "4px 0", borderBottom: "1px solid var(--line-2)" }}>
+                            <span className="mono">{a.id}</span>
+                            <span className="spacer" />
+                            <span className="muted">{inr(a.amount)}</span>
+                            <span style={{ width: 10 }} />
+                            <span className={a.days_left != null && a.days_left <= 1
+                              ? "badge flat" : "muted"}>
+                              {a.days_left != null ? `${a.days_left}d left` : "—"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <button className="btn pri" style={{ width: "100%", marginTop: 12 }}
                           disabled={!delegated || busy || preview.auto_count === 0}

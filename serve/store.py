@@ -39,7 +39,6 @@ HOLD_PWIN = "p_win"
 HOLD_AMOUNT = "amount"
 HOLD_PACKET = "packet"
 HOLD_BUDGET = "budget"
-HOLD_DEADLINE = "deadline"
 HOLD_BALANCE = "balance"
 
 HOLD_LABEL = {
@@ -48,11 +47,10 @@ HOLD_LABEL = {
     HOLD_AMOUNT:  "Above your amount ceiling",
     HOLD_PACKET:  "Packet is short of the rulebook requirement",
     HOLD_BUDGET:  "Daily spend cap reached",
-    HOLD_DEADLINE: "Too close to the response deadline",
     HOLD_BALANCE: "Wallet balance too low",
 }
 HOLD_ORDER = [HOLD_POLICY, HOLD_PWIN, HOLD_AMOUNT, HOLD_PACKET,
-              HOLD_DEADLINE, HOLD_BUDGET, HOLD_BALANCE]
+              HOLD_BUDGET, HOLD_BALANCE]
 
 
 def _now() -> str:
@@ -80,6 +78,17 @@ def _ev_of(scored: dict) -> float:
     return float(scored["ev"]["value"])
 
 
+# Days of slack before the response window shuts. A case with no deadline
+# overlay is treated as maximally slack, so a dispute whose deadline is simply
+# unknown never jumps ahead of one that is genuinely expiring.
+_MAX_SLACK = 99
+
+
+def _slack_of(scored: dict) -> int:
+    d = scored.get("days_left")
+    return _MAX_SLACK if d is None else int(d)
+
+
 class Store:
     def __init__(self) -> None:
         self.reset()
@@ -94,14 +103,9 @@ class Store:
         self.policy = {
             "mode": "manual",              # "manual" | "delegated"
             "min_p_win": 0.70,
-            "max_amount": 15_000.0,
+            "max_amount": 5_000.0,
             "require_complete_packet": True,
-            "daily_spend_cap": 50_000.0,
-            # Refuse to auto-act with fewer than this many days left.
-            # 0 disables the gate. Razorpay's published merchant window
-            # is 3 business days, modelled as 4 calendar days, so the
-            # useful range here is 0-3: at 4 nothing is ever eligible.
-            "min_days_left": 1,
+            "daily_spend_cap": 5_000.0,
         }
 
     # -- wallet ------------------------------------------------------------
@@ -145,7 +149,6 @@ class Store:
             "net": round(self.recovered - self.spent, 2),
             "spent_today": round(self.spent_today(), 2),
             "daily_spend_cap": self.policy["daily_spend_cap"],
-            "min_days_left": self.policy["min_days_left"],
             "ledger": list(reversed(self.ledger))[:60],
             "constants": adapter.CONSTANTS,
         }
@@ -239,16 +242,6 @@ class Store:
                 f"amount above your ₹{p['max_amount']:,.0f} ceiling"
         if p["require_complete_packet"] and s["blocked"]:
             return False, HOLD_PACKET, "packet is short of the rulebook requirement"
-        # Deadline gate, BEFORE the cost checks: a dispute that cannot be acted
-        # on in time must not consume budget in the preview. days_left is None
-        # when the deadline overlay is absent, in which case this gate is
-        # skipped rather than failing closed -- an absent field is a missing
-        # feature, not an expired dispute.
-        days_left = s.get("days_left")
-        if days_left is not None and p["min_days_left"] > 0 \
-                and days_left < p["min_days_left"]:
-            return False, HOLD_DEADLINE, \
-                f"{days_left}d left, below your {p['min_days_left']}d bar"
         cost = _cost_of(s)
         if cost > budget_left:
             return False, HOLD_BUDGET, "daily spend cap reached"
@@ -259,11 +252,12 @@ class Store:
     def preview(self, scored: list[dict]) -> dict:
         """What delegation would do to the open queue, without doing it.
 
-        BEST FIRST. The queue is sorted by expected value before the budget is
-        walked, so a capped run spends on the most valuable cases rather than
-        whichever happened to arrive first. Iterating in arrival order made the
-        daily cap pick an arbitrary subset -- the count was right and the
-        selection was not.
+        EXPIRING FIRST, THEN BEST VALUE PER RUPEE. The queue is ordered by days
+        of slack before the budget is walked, and within a slack band by
+        expected value per rupee of cost. Iterating in arrival order made the
+        daily cap pick an arbitrary subset; iterating by raw value spent the cap
+        on whatever was worth most even when it was not the thing about to
+        expire. See the sort below for why urgency comes first.
 
         HOLDS ARE GROUPED. A case the policy declined is unreachable by any
         slider; a case stopped by the budget would be picked up by raising the
@@ -273,8 +267,31 @@ class Store:
         """
         budget = self.policy["daily_spend_cap"] - self.spent_today()
         opens = [s for s in scored if self.state_of(s["id"]) == OPEN]
-        opens.sort(key=lambda s: _ev_of(s) / max(_cost_of(s), 1e-9),
-                   reverse=True)
+        # URGENCY FIRST, THEN VALUE PER RUPEE.
+        #
+        # Sorting on value alone spends today's cap on whatever is worth most,
+        # ignoring that most of it does not expire today. Razorpay allows 3
+        # business days to represent a chargeback, so a case with 3 days of
+        # slack is still there tomorrow at no cost; a case with 1 day left is
+        # act-now-or-lose-it. Deferring the first costs nothing. Deferring the
+        # second costs the whole dispute.
+        #
+        # The key is a tuple, compared left to right: slack picks the band,
+        # value per rupee orders within it. So a Rs 1,800 case with 1 day left
+        # outranks a Rs 3,000 case with 3 days, because tomorrow only one of
+        # them still exists.
+        #
+        # Value per rupee, not raw value, because the cap is denominated in
+        # rupees: a blocked packet costs 4x a clean one, so raw EV let
+        # expensive cases crowd out cheaper, better-value ones.
+        #
+        # LIMIT, stated rather than hidden: this is right when tomorrow has
+        # spare capacity. With a queue far deeper than the daily cap, tomorrow
+        # is saturated too, and strict day-banding can spend on small expiring
+        # cases while large ones age out. Fixing that needs multi-day planning,
+        # which this does not attempt.
+        opens.sort(key=lambda s: (_slack_of(s),
+                                  -_ev_of(s) / max(_cost_of(s), 1e-9)))
 
         auto, held, spend = [], [], 0.0
         for s in opens:
@@ -284,9 +301,11 @@ class Store:
                 spend += cost
                 auto.append({"id": s["id"], "amount": s["amount"],
                              "network": s.get("network"),
+                             "days_left": s.get("days_left"),
                              "p_win": s["p_win"], "ev": _ev_of(s), "cost": cost})
             else:
                 held.append({"id": s["id"], "amount": s["amount"],
+                             "days_left": s.get("days_left"),
                              "p_win": s["p_win"], "ev": _ev_of(s),
                              "reason": why, "reason_code": code})
 

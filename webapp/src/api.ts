@@ -213,14 +213,19 @@ export interface Policy {
   max_amount: number;
   require_complete_packet: boolean;
   daily_spend_cap: number;
-  min_days_left: number;
 }
 
 export interface Preview {
-  auto: { id: string; amount: number; p_win: number; cost: number }[];
-  held: { id: string; amount: number; p_win: number; reason: string }[];
+  auto: { id: string; amount: number; p_win: number; cost: number;
+          days_left: number | null }[];
+  held: { id: string; amount: number; p_win: number; reason: string;
+          days_left: number | null }[];
   auto_count: number; held_count: number;
   projected_spend: number; projected_recovery: number;
+  projected_net: number;
+  binding_constraint: string | null;
+  binding_label: string | null;
+  budget_exhausted: boolean;
 }
 
 export interface CustomerRow extends Customer {

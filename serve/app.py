@@ -7,6 +7,8 @@ file routes and serialises; it does not decide anything.
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -50,8 +52,30 @@ def _decorate(s: dict) -> dict:
     return s
 
 
+# TODAY'S INBOX, not the whole holdout.
+#
+# The holdout is 800 disputes, ~455 of them contestable. A Rs 5,000 daily cap
+# buys 20 cases. So against the full set the cap is ALWAYS the binding
+# constraint: any filter that leaves more than 20 cases standing cannot change
+# the count, because the budget just refills from the next-best case. That is
+# arithmetic, not a bug -- but it makes every other limit look inert, because
+# 800 disputes is a 23-day backlog being presented as one day's work.
+#
+# Sizing this to a realistic day puts the queue near the margin, where both
+# behaviours are visible: at a low confidence bar more cases survive than the
+# cap affords, so the deadline ordering decides WHICH ones run; at a high bar
+# fewer survive than the cap affords, so the filter decides HOW MANY. Both are
+# real, and neither shows up when one constraint dominates permanently.
+#
+# The full 800 are untouched as the eval set. This bounds the DASHBOARD only.
+# Override without editing code: set CB_QUEUE_SIZE, or 0 for the whole file.
+DEMO_QUEUE_SIZE = int(os.environ.get("CB_QUEUE_SIZE", "160"))
+
+
 def _all_scored() -> list[dict]:
     rows, _ = adapter.load_disputes()
+    if DEMO_QUEUE_SIZE > 0:
+        rows = rows[:DEMO_QUEUE_SIZE]
     return [_decorate(adapter.summary(evidence.hydrate(d))) for d in rows]
 
 
@@ -324,8 +348,6 @@ class Policy(BaseModel):
     max_amount: float | None = None
     require_complete_packet: bool | None = None
     daily_spend_cap: float | None = None
-    # Minimum days remaining before the agent may act unattended. 0 disables.
-    min_days_left: int | None = None
 
 
 @app.get("/api/policy")
