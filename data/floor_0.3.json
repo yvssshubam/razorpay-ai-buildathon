@@ -6,14 +6,14 @@
     "hallucination": 0.0,
     "precision_winnable": 0.394,
     "recall_winnable": 1.0,
-    "precision_ev": 0.666,
+    "precision_ev": 0.695,
     "recall_ev": 1.0,
     "cost_wrong": {
       "paid_to_lose": 326050.0,
       "left_behind": 0.0,
       "total": 326050.0
     },
-    "net_rupees": 293402.03,
+    "net_rupees": 403752.59,
     "outcome_mix": {
       "submitted": 484,
       "accepted": 0,
@@ -25,41 +25,41 @@
         "n": 135,
         "precision_winnable": 0.859,
         "recall_winnable": 1.0,
-        "precision_ev": 0.97,
+        "precision_ev": 0.978,
         "recall_ev": 1.0,
-        "net_rupees": 234369.54
+        "net_rupees": 273626.41
       },
       "B": {
         "n": 109,
         "precision_winnable": 0.642,
         "recall_winnable": 1.0,
-        "precision_ev": 0.945,
+        "precision_ev": 0.963,
         "recall_ev": 1.0,
-        "net_rupees": 161605.31
+        "net_rupees": 189689.21
       },
       "C": {
         "n": 287,
         "precision_winnable": 0.359,
         "recall_winnable": 1.0,
-        "precision_ev": 0.794,
+        "precision_ev": 0.84,
         "recall_ev": 1.0,
-        "net_rupees": 11273.61
+        "net_rupees": 41345.45
       },
       "D": {
         "n": 151,
         "precision_winnable": 0.132,
         "recall_winnable": 1.0,
-        "precision_ev": 0.397,
+        "precision_ev": 0.43,
         "recall_ev": 1.0,
-        "net_rupees": 1854.14
+        "net_rupees": 13572.77
       },
       "E": {
         "n": 118,
         "precision_winnable": 0.051,
         "recall_winnable": 1.0,
-        "precision_ev": 0.093,
+        "precision_ev": 0.11,
         "recall_ev": 1.0,
-        "net_rupees": -115700.56
+        "net_rupees": -114481.26
       }
     }
   },
@@ -74,8 +74,8 @@
     "recall_ev": 0.0,
     "cost_wrong": {
       "paid_to_lose": 0.0,
-      "left_behind": 697677.47,
-      "total": 697677.47
+      "left_behind": 812408.01,
+      "total": 812408.01
     },
     "net_rupees": 0.0,
     "outcome_mix": {
@@ -132,61 +132,61 @@
     "contest_cost": 250.0,
     "completeness": 1.0,
     "hallucination": 0.0,
-    "precision_winnable": 0.601,
-    "recall_winnable": 0.692,
-    "precision_ev": 0.956,
-    "recall_ev": 0.651,
+    "precision_winnable": 0.599,
+    "recall_winnable": 0.711,
+    "precision_ev": 0.957,
+    "recall_ev": 0.644,
     "cost_wrong": {
-      "paid_to_lose": 53050.0,
-      "left_behind": 148036.36,
-      "total": 201086.36
+      "paid_to_lose": 55100.0,
+      "left_behind": 165256.45,
+      "total": 220356.45
     },
-    "net_rupees": 479384.88,
+    "net_rupees": 570010.47,
     "outcome_mix": {
-      "submitted": 334,
-      "accepted": 437,
-      "escalated": 29
+      "submitted": 342,
+      "accepted": 426,
+      "escalated": 32
     },
-    "human_queue": 29,
+    "human_queue": 32,
     "per_tier": {
       "A": {
         "n": 135,
-        "precision_winnable": 0.854,
-        "recall_winnable": 0.957,
+        "precision_winnable": 0.856,
+        "recall_winnable": 0.974,
         "precision_ev": 1.0,
-        "recall_ev": 0.992,
-        "net_rupees": 234598.23
+        "recall_ev": 1.0,
+        "net_rupees": 273841.0
       },
       "B": {
         "n": 109,
-        "precision_winnable": 0.631,
-        "recall_winnable": 0.929,
-        "precision_ev": 0.99,
-        "recall_ev": 0.99,
-        "net_rupees": 161428.16
+        "precision_winnable": 0.638,
+        "recall_winnable": 0.957,
+        "precision_ev": 1.0,
+        "recall_ev": 1.0,
+        "net_rupees": 189770.48
       },
       "C": {
         "n": 287,
-        "precision_winnable": 0.387,
-        "recall_winnable": 0.398,
-        "precision_ev": 0.962,
-        "recall_ev": 0.447,
-        "net_rupees": 91676.01
+        "precision_winnable": 0.384,
+        "recall_winnable": 0.417,
+        "precision_ev": 0.964,
+        "recall_ev": 0.448,
+        "net_rupees": 114716.31
       },
       "D": {
         "n": 151,
-        "precision_winnable": 0.045,
+        "precision_winnable": 0.043,
         "recall_winnable": 0.05,
-        "precision_ev": 0.5,
-        "recall_ev": 0.183,
-        "net_rupees": -6217.52
+        "precision_ev": 0.478,
+        "recall_ev": 0.169,
+        "net_rupees": -6217.32
       },
       "E": {
         "n": 118,
         "precision_winnable": 0.0,
         "recall_winnable": 0.0,
         "precision_ev": 1.0,
-        "recall_ev": 0.182,
+        "recall_ev": 0.154,
         "net_rupees": -2100.0
       }
     }

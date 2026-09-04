@@ -1,3 +1,14 @@
+"""Stage 3: grounded packet drafting.
+
+The model receives ONLY the artifacts that Stage 2's deterministic lookup
+retrieved for this reason code. It never sees the full order record, so it
+cannot cite something that was never retrieved -- one whole class of
+fabrication is removed by construction rather than by instruction.
+
+Output is a structured claims list, not prose. Every claim carries the ID of
+the artifact that supports it and the evidence kind it asserts. Free prose
+cannot be verified claim-by-claim; this shape can.
+"""
 import json
 import os
 import sys

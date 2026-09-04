@@ -99,13 +99,13 @@ class Store:
         self.actor: dict[str, str] = {}
         self.audit: list[dict] = []
         self.ledger: list[dict] = []
-        self.opening_balance = 25_000.0
+        self.opening_balance = 150_000.0
         self.policy = {
             "mode": "manual",              # "manual" | "delegated"
             "min_p_win": 0.70,
             "max_amount": 5_000.0,
             "require_complete_packet": True,
-            "daily_spend_cap": 5_000.0,
+            "daily_spend_cap": 35_000.0,
         }
 
     # -- wallet ------------------------------------------------------------

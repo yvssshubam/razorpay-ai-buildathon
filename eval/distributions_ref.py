@@ -176,9 +176,39 @@ def draw_day_of_week(rng):
 #                          underlying facts, so they get no skill bonus on the
 #                          win rate. Conservative by design.
 # ---------------------------------------------------------------------------
-CONTEST_COST = 250.0          # INR, merchant effort to assemble and submit
+# MERCHANT EFFORT ONLY. This UNDERSTATES the real cost of contesting, and the
+# understatement runs against this project's own argument -- stated here rather
+# than buried, because contest cost is the single input the headline rests on.
+#
+# Razorpay publishes chargeback cost in five layers. Two of them are charged
+# only when you contest, and are therefore decision-relevant:
+#
+#   representment fee      Rs   750-1,500   contest only   -> NOT modelled here
+#   evidence submission    Rs   200-  500   contest only   -> NOT modelled here
+#   base/dispute fee       Rs   500-  750   BOTH branches  -> correctly ignored
+#   platform fee 2.36%     sunk at sale     BOTH branches  -> correctly ignored
+#   funds held 90-120 days                  contest only   -> NOT modelled here
+#
+# So the sourced contest-only floor is ~Rs 950-2,000 before any merchant
+# effort. Using Rs 250 understates contest cost by roughly 5-9x. Because a
+# HIGHER contest cost makes contest-everything look worse and triage look
+# better, this choice is CONSERVATIVE: it weakens the project's own case rather
+# than flattering it. agent/cost_sweep.py sweeps the constant to Rs 900, and
+# the ordering holds throughout. Setting it to 1725.0 (the sourced midpoint,
+# 1,125 + 350 + 250) turns contest-everything sharply negative.
+CONTEST_COST = 250.0
 HUMAN_REVIEW_COST = 800.0     # INR, analyst time on an escalated packet
-NET_RECOVERY_FRACTION = 0.9764  # BASE: standard domestic, 2% + 18% GST = 2.36%
+# BASE: standard domestic, 2% + 18% GST = 2.36%. Instrument-specific values
+# come from net_recovery() below -- do not price a dispute off this scalar.
+#
+# KNOWN SIMPLIFICATION: the platform fee is charged at the time of SALE and is
+# not re-charged on a reversal, so winning a representment restores the full
+# disputed amount. Strictly it is identical on both branches of the decision
+# and should cancel out of a contest-vs-accept comparison, leaving this at 1.0.
+# It is retained as a haircut because it is the more conservative reading and
+# because the sweep shows the choice is not load-bearing: the margin moves
+# under 4% across the whole 0.90-1.00 range.
+NET_RECOVERY_FRACTION = 0.9764
 HUMAN_RESOLVE_RATE = 0.80     # share of escalated packets a human can fix
 
 # Instruments charged at the premium 3% + GST rate (= 3.54% effective) rather
