@@ -12,6 +12,41 @@ saw, against two mandatory baselines. A metric without a baseline is decoration.
 
 ---
 
+## Live demo
+
+**https://razorpay-ai-buildathon.onrender.com**
+
+Free instance, so the first request after a quiet period takes 30 to 60 seconds
+to wake. Give it a moment before deciding it is broken.
+
+`/api/health` reports which `p(win)` source is actually serving the numbers. If
+it says anything other than `learned`, the dashboard is showing the hand-written
+fallback rather than the calibrated model, and nothing on screen should be
+believed. That check exists because a stale pickle failing silently is error 4
+in the log below.
+
+The dashboard runs a 160-dispute demo queue sized to one realistic day, not the
+800-dispute holdout. The holdout is the eval set and the UI never touches it, so
+every figure in section 1 stays reproducible from the CLI.
+
+---
+
+## The problem, end to end
+
+[![Chargeback journey, customer view](docs/customer-journey.png)]
+
+One 10,000 rupee order between a merchant and a customer, from checkout to
+learning loop. It covers the five places evidence is created before any dispute
+exists, the response clock and the separate 45-day UPI lane, the two
+structurally different cases that look identical on day 20, the three gates that
+can each end a case, the amount-versus-odds grid that decides what is worth
+fighting, and what a win is actually worth once fees and labour come out.
+
+Editable source: [`docs/chargeback-customer-journey.excalidraw`](docs/chargeback-customer-journey.excalidraw).
+Component-level architecture is in [`docs/architecture.svg`](docs/architecture.svg).
+
+---
+
 ## 1. Results
 
 ### The decision (Stage 1)
